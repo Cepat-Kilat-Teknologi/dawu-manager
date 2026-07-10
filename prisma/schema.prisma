@@ -1,0 +1,82 @@
+// Prisma schema for dawu-manager
+// SQLite — zero-config embedded database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Auth — users and browser sessions
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         String     @default("viewer") // admin | operator | viewer
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  sessions     Session[]
+  auditLogs    AuditLog[]
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure — managed dawos-agent nodes
+// ---------------------------------------------------------------------------
+
+model Node {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  url       String
+  apiKey    String
+  location  String?
+  tags      String? // JSON array: ["production","jakarta"]
+  status    String     @default("unknown") // online | offline | degraded | unknown
+  lastSeen  DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  auditLogs AuditLog[]
+}
+
+// ---------------------------------------------------------------------------
+// Observability — central audit trail
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  nodeId    String?
+  action    String // "session.terminate", "config.apply", "node.create"
+  detail    String? // JSON context
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  node      Node?    @relation(fields: [nodeId], references: [id])
+
+  @@index([userId])
+  @@index([nodeId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Config — key-value settings store
+// ---------------------------------------------------------------------------
+
+model Setting {
+  key   String @id
+  value String
+}

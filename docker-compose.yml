@@ -1,0 +1,17 @@
+services:
+  dawu-manager:
+    build: .
+    container_name: dawu-manager
+    ports:
+      - "3789:3789"
+    volumes:
+      - dawu-data:/data
+    environment:
+      - DATABASE_URL=file:/data/dawu.db
+      - NEXTAUTH_SECRET=change-me-to-a-random-string
+      - NEXTAUTH_URL=http://localhost:3789
+      - AUTH_TRUST_HOST=true
+    restart: unless-stopped
+
+volumes:
+  dawu-data:

@@ -32,6 +32,14 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# database
+*.db
+*.db-journal
+
+# dawu-manager data
+.dawu-manager/
 
 # vercel
 .vercel
@@ -39,3 +47,28 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code AI instructions (private, not committed)
+CLAUDE.md
+AGENTS.md
+.agents/
+.omc/
+skills-lock.json
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+
+# Prisma
+prisma/*.db
+prisma/migrations/**/migration_lock.toml
+
+# Standalone output (Next.js best practice)
+.next/standalone/
