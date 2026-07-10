@@ -41,9 +41,9 @@ export function ProxyDataTable<T extends object>({
   getRowKey,
 }: ProxyDataTableProps<T>) {
   return (
-    <div className="rounded-md border overflow-x-auto">
+    <div className="responsive-table rounded-lg border md:max-h-[70vh] md:overflow-auto">
       <Table>
-        <TableHeader>
+        <TableHeader className="md:sticky md:top-0 md:z-10 md:bg-card">
           <TableRow>
             {columns.map((col) => (
               <TableHead key={col.header} className={col.className}>
@@ -54,9 +54,16 @@ export function ProxyDataTable<T extends object>({
         </TableHeader>
         <TableBody>
           {data.map((row, i) => (
-            <TableRow key={getRowKey ? getRowKey(row, i) : i}>
+            <TableRow
+              key={getRowKey ? getRowKey(row, i) : i}
+              className="transition-colors hover:bg-accent/40"
+            >
               {columns.map((col) => (
-                <TableCell key={col.header} className={col.className}>
+                <TableCell
+                  key={col.header}
+                  className={col.className}
+                  data-label={col.header}
+                >
                   {col.cell
                     ? col.cell(row)
                     : col.accessorKey

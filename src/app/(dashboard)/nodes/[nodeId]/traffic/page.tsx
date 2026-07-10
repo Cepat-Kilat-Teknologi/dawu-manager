@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useNodeProxy, useNodeProxyMutation } from "@/hooks/use-node-proxy";
+import { TrafficChartLazy } from "@/components/charts/traffic-chart-lazy";
 import { NodePageShell } from "@/components/node/node-page-shell";
 import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-table";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,16 @@ export default function TrafficPage() {
 
   return (
     <div className="space-y-6">
+      <section className="rounded-xl border bg-card p-4 md:p-6">
+        <div className="mb-4">
+          <h2 className="text-lg">Real-time Traffic</h2>
+          <p className="text-sm text-muted-foreground">
+            Live throughput — rolling 5-minute window, 1s resolution.
+          </p>
+        </div>
+        <TrafficChartLazy nodeId={nodeId} height={380} />
+      </section>
+
       <NodePageShell
         title={`Rate Limits (${ratelimits.data?.length ?? 0})`}
         isLoading={ratelimits.isLoading}

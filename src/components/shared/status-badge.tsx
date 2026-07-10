@@ -10,7 +10,7 @@ const statusConfig: Record<
   [NODE_STATUS.ONLINE]: {
     label: "Online",
     className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-400",
-    dot: "bg-emerald-500",
+    dot: "bg-emerald-500 animate-led-pulse shadow-emerald-500",
   },
   [NODE_STATUS.OFFLINE]: {
     label: "Offline",

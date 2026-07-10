@@ -14,7 +14,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/layout/mobile-nav";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs";
+import { LogOut, Moon, Sun, Search } from "lucide-react";
 import { toast } from "sonner";
 
 /**
@@ -64,11 +65,43 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
-      {/* Mobile hamburger */}
+      {/* Mobile hamburger (tablet only) */}
       <MobileNav userRole={user?.role} />
+
+      {/* Breadcrumbs */}
+      <Breadcrumbs />
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Command palette trigger */}
+      <button
+        type="button"
+        onClick={() =>
+          window.dispatchEvent(new Event("open-command-palette"))
+        }
+        aria-label="Open command palette"
+        className="hidden items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted sm:flex"
+      >
+        <Search className="h-4 w-4" aria-hidden="true" />
+        <span>Search…</span>
+        <kbd className="rounded border border-border bg-background px-1.5 text-[10px] font-medium">
+          ⌘K
+        </kbd>
+      </button>
+
+      {/* Command palette trigger (compact, mobile) */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 text-muted-foreground hover:text-foreground sm:hidden"
+        onClick={() =>
+          window.dispatchEvent(new Event("open-command-palette"))
+        }
+        aria-label="Open command palette"
+      >
+        <Search className="h-4 w-4" aria-hidden="true" />
+      </Button>
 
       {/* Theme toggle */}
       <ThemeToggle />

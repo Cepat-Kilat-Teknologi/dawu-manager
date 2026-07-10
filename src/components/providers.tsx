@@ -33,16 +33,17 @@ export function Providers({ children }: ProvidersProps) {
   );
 
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
           {children}
-          <Toaster richColors position="bottom-right" />
+          <Toaster
+            richColors
+            closeButton
+            position="top-right"
+            visibleToasts={5}
+            duration={5000}
+          />
         </SessionProvider>
       </QueryClientProvider>
     </ThemeProvider>

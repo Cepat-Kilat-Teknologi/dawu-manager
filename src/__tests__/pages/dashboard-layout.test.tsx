@@ -38,6 +38,12 @@ vi.mock("@/components/layout/sidebar", () => ({
 vi.mock("@/components/layout/header", () => ({
   Header: () => <div data-testid="header">Header</div>,
 }));
+vi.mock("@/components/layout/bottom-nav", () => ({
+  BottomNav: () => <div data-testid="bottom-nav" />,
+}));
+vi.mock("@/components/command-palette", () => ({
+  CommandPalette: () => <div data-testid="command-palette" />,
+}));
 
 import DashboardLayout from "@/app/(dashboard)/layout";
 

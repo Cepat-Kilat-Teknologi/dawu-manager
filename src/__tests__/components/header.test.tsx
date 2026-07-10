@@ -139,4 +139,26 @@ describe("Header", () => {
     render(<Header />);
     expect(screen.queryByText("Profile")).not.toBeInTheDocument();
   });
+
+  it("renders breadcrumbs", () => {
+    render(<Header />);
+    expect(
+      screen.getByRole("navigation", { name: "Breadcrumb" }),
+    ).toBeInTheDocument();
+  });
+
+  it("dispatches the command-palette event from both triggers", () => {
+    const spy = vi.spyOn(window, "dispatchEvent");
+    render(<Header />);
+    const triggers = screen.getAllByLabelText("Open command palette");
+    expect(triggers.length).toBeGreaterThanOrEqual(2);
+    for (const trigger of triggers) {
+      fireEvent.click(trigger);
+    }
+    const events = spy.mock.calls
+      .map((c) => (c[0] as Event).type)
+      .filter((t) => t === "open-command-palette");
+    expect(events.length).toBeGreaterThanOrEqual(2);
+    spy.mockRestore();
+  });
 });

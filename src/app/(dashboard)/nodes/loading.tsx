@@ -1,24 +1,20 @@
-import { SkeletonNodeCard } from "@/components/shared/loading-skeleton";
+import { SkeletonTable } from "@/components/shared/skeleton-blocks";
 
 /**
  * Loading skeleton for the nodes list page.
- * Shows placeholder node cards while data is being fetched.
+ * Shows a header placeholder and a table skeleton while data is fetched.
  */
 export default function NodesLoading() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <div className="h-8 w-24 animate-pulse rounded-md bg-muted" />
-          <div className="h-4 w-48 animate-pulse rounded-md bg-muted" />
+        <div className="space-y-2">
+          <div className="skeleton-shimmer h-8 w-24 rounded-md" />
+          <div className="skeleton-shimmer h-4 w-48 rounded-md" />
         </div>
-        <div className="h-9 w-28 animate-pulse rounded-md bg-muted" />
+        <div className="skeleton-shimmer h-9 w-28 rounded-md" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <SkeletonNodeCard key={i} />
-        ))}
-      </div>
+      <SkeletonTable rows={8} />
     </div>
   );
 }

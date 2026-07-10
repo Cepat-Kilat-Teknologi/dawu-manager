@@ -7,39 +7,35 @@ import NodesLoading from "@/app/(dashboard)/nodes/loading";
 import NodeDetailLoading from "@/app/(dashboard)/nodes/[nodeId]/loading";
 
 describe("DashboardLoading", () => {
-  it("renders skeleton stat cards and node cards", () => {
+  it("renders shimmer skeletons for stats and node grid", () => {
     const { container } = render(<DashboardLoading />);
-    // 4 stat card skeletons + 3 node card skeletons = 7 skeleton groups
-    const skeletons = container.querySelectorAll("[aria-hidden='true']");
-    expect(skeletons.length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".skeleton-shimmer").length).toBeGreaterThan(0);
   });
 
-  it("renders animate-pulse elements", () => {
-    const { container } = render(<DashboardLoading />);
-    const pulses = container.querySelectorAll(".animate-pulse");
-    expect(pulses.length).toBeGreaterThan(0);
+  it("renders skeleton tiles for the node grid", () => {
+    const { getAllByTestId } = render(<DashboardLoading />);
+    expect(getAllByTestId("skeleton-tile").length).toBe(6);
   });
 });
 
 describe("NodesLoading", () => {
-  it("renders skeleton node cards", () => {
-    const { container } = render(<NodesLoading />);
-    const pulses = container.querySelectorAll(".animate-pulse");
-    expect(pulses.length).toBeGreaterThan(0);
+  it("renders a shimmer table skeleton", () => {
+    const { container, getByTestId } = render(<NodesLoading />);
+    expect(container.querySelectorAll(".skeleton-shimmer").length).toBeGreaterThan(0);
+    expect(getByTestId("skeleton-table")).toBeInTheDocument();
   });
 
   it("renders the header skeleton area", () => {
     const { container } = render(<NodesLoading />);
-    // Two header placeholders + button placeholder
     const headerDiv = container.querySelector(".flex.items-center.justify-between");
     expect(headerDiv).toBeTruthy();
   });
 });
 
 describe("NodeDetailLoading", () => {
-  it("renders SkeletonDetail", () => {
-    const { container } = render(<NodeDetailLoading />);
-    const skeletons = container.querySelectorAll("[aria-hidden='true']");
-    expect(skeletons.length).toBeGreaterThan(0);
+  it("renders stat and text skeletons", () => {
+    const { container, getByTestId } = render(<NodeDetailLoading />);
+    expect(container.querySelectorAll(".skeleton-shimmer").length).toBeGreaterThan(0);
+    expect(getByTestId("skeleton-text")).toBeInTheDocument();
   });
 });

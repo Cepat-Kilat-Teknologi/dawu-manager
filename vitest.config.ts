@@ -17,6 +17,7 @@ export default defineConfig({
       ],
       exclude: [
         "src/components/ui/**",
+        "src/components/charts/**",
         "src/app/layout.tsx",
         "src/app/globals.css",
         "src/**/*.d.ts",

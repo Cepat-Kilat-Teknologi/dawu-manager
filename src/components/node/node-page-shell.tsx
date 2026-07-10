@@ -2,7 +2,8 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertCircle, RefreshCw, ExternalLink, Info } from "lucide-react";
+import { AlertCircle, RefreshCw, ExternalLink, Info } from "lucide-react";
+import { SkeletonTable } from "@/components/shared/skeleton-blocks";
 import { ProxyError } from "@/hooks/use-node-proxy";
 
 const DOCS_URL = "https://cepat-kilat-teknologi.github.io/dawos-agent/";
@@ -80,9 +81,12 @@ export function NodePageShell({
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+        <CardHeader>
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+        <CardContent role="status" aria-live="polite">
+          <span className="sr-only">Loading...</span>
+          <SkeletonTable rows={6} />
         </CardContent>
       </Card>
     );
@@ -127,9 +131,9 @@ export function NodePageShell({
 
   if (isEmpty) {
     return (
-      <Card>
+      <Card className="rounded-xl border-border">
         <CardHeader>
-          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardTitle className="font-heading text-lg">{title}</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-12">
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>
@@ -139,12 +143,12 @@ export function NodePageShell({
   }
 
   return (
-    <Card>
+    <Card className="rounded-xl border-border">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">{title}</CardTitle>
+        <CardTitle className="font-heading text-lg">{title}</CardTitle>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="content-fade-in">{children}</CardContent>
     </Card>
   );
 }

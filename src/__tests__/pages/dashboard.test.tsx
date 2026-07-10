@@ -41,7 +41,7 @@ describe("DashboardPage", () => {
 
     expect(screen.getByText("Dashboard")).toBeTruthy();
     expect(screen.getAllByText("No nodes configured").length).toBeGreaterThan(0);
-    expect(screen.getByText("Add Node")).toBeTruthy();
+    expect(screen.getByText("Add your first node")).toBeTruthy();
   });
 
   it("renders stats with node counts", async () => {

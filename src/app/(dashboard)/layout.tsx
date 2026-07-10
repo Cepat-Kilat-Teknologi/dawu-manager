@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { BottomNav } from "@/components/layout/bottom-nav";
+import { CommandPalette } from "@/components/command-palette";
+import { PageTransition } from "@/components/shared/page-transition";
 
 /**
  * Protected dashboard layout (server component).
@@ -29,12 +32,16 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen lg:pl-[260px]">
       <Sidebar userRole={session.user.role} />
-      <div className="flex flex-1 flex-col md:pl-64">
+      <div className="flex min-h-screen flex-1 flex-col">
         <Header />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col p-4 pb-24 md:p-6 lg:pb-6">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
+      <BottomNav />
+      <CommandPalette />
     </div>
   );
 }

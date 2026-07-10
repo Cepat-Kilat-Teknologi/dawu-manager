@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { formatDate, formatUptime } from "@/lib/utils";
 import { Clock, Server, MapPin, Activity } from "lucide-react";
 
@@ -67,63 +68,31 @@ export default async function NodeDetailPage({ params }: NodeDetailPageProps) {
     <div className="space-y-6">
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <Server className="h-3.5 w-3.5" aria-hidden="true" />
-              dawos-agent
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {version ?? "Unknown"}
-            </p>
-            {accelVersion && (
-              <p className="text-xs text-muted-foreground mt-1">
-                accel-ppp: {accelVersion}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-              Uptime
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {uptime ? formatUptime(uptime) : "—"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-              Location
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {node.location || "Not set"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-              <Activity className="h-3.5 w-3.5" aria-hidden="true" />
-              Last Seen
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-semibold">
-              {node.lastSeen ? formatDate(node.lastSeen) : "Never"}
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="dawos-agent"
+          value={version ?? "Unknown"}
+          icon={Server}
+          variant="default"
+          description={accelVersion ? `accel-ppp: ${accelVersion}` : undefined}
+        />
+        <StatCard
+          title="Uptime"
+          value={uptime ? formatUptime(uptime) : "—"}
+          icon={Clock}
+          variant="success"
+        />
+        <StatCard
+          title="Location"
+          value={node.location || "Not set"}
+          icon={MapPin}
+          variant="warning"
+        />
+        <StatCard
+          title="Last Seen"
+          value={node.lastSeen ? formatDate(node.lastSeen) : "Never"}
+          icon={Activity}
+          variant="default"
+        />
       </div>
 
       {/* Node information */}

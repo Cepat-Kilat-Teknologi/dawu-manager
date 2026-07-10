@@ -12,10 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { FormAlert } from "@/components/shared/form-alert";
+import { SpinnerButton } from "@/components/shared/spinner-button";
 
 /**
  * Add Node page.
@@ -88,7 +89,7 @@ export default function NewNodePage() {
         </div>
       </div>
 
-      <Card className="max-w-lg">
+      <Card className="max-w-xl">
         <CardHeader>
           <CardTitle>Node Details</CardTitle>
           <CardDescription>
@@ -161,12 +162,9 @@ export default function NewNodePage() {
               />
             </div>
             <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={loading}>
-                {loading && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+              <SpinnerButton type="submit" loading={loading} loadingText="Adding…">
                 Add Node
-              </Button>
+              </SpinnerButton>
               <Button render={<Link href="/nodes" />} type="button" variant="outline">
                   Cancel
               </Button>

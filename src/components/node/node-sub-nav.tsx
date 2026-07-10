@@ -11,10 +11,9 @@ interface NodeSubNavProps {
 }
 
 /**
- * Horizontal sub-navigation for per-node category pages.
- * Renders grouped tabs that highlight the active category based on pathname.
- * Uses the data-driven nodeNavSections from navigation config.
- * Scrollable on mobile for narrow viewports.
+ * Premium horizontal sub-navigation for per-node category pages.
+ * Renders scrollable flat pills grouped by section with a primary underline on
+ * the active tab. Sticky under the node header; all 16 node pages inherit it.
  */
 export function NodeSubNav({ nodeId }: NodeSubNavProps) {
   const pathname = usePathname();
@@ -22,10 +21,10 @@ export function NodeSubNav({ nodeId }: NodeSubNavProps) {
 
   return (
     <nav
-      className="border-b bg-card"
+      className="sticky top-16 z-20 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60"
       aria-label="Node navigation"
     >
-      <div className="flex overflow-x-auto scrollbar-none">
+      <div className="scrollbar-thin flex overflow-x-auto">
         {nodeNavSections.map((section) => (
           <div key={section.title} className="flex items-center">
             {section.items.map((item) => {
@@ -41,21 +40,22 @@ export function NodeSubNav({ nodeId }: NodeSubNavProps) {
                   key={item.href}
                   href={href}
                   className={cn(
-                    "flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors",
-                    "border-b-2 -mb-px",
-                    "hover:text-foreground",
+                    "-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
                       ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground",
+                      : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                   aria-current={isActive ? "page" : undefined}
                 >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                   {item.title}
                 </Link>
               );
             })}
-            <div className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+            <div
+              className="mx-1 h-4 w-px shrink-0 bg-border"
+              aria-hidden="true"
+            />
           </div>
         ))}
       </div>

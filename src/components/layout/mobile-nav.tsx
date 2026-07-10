@@ -32,12 +32,11 @@ export function MobileNav({ userRole = "viewer" }: MobileNavProps) {
   const pathname = usePathname();
 
   return (
-    <div className="md:hidden">
+    <div className="hidden md:block lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
           onClick={() => setOpen(true)}
           aria-label="Open navigation menu"
           aria-expanded={open}
