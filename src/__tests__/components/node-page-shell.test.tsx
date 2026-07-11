@@ -130,7 +130,7 @@ describe("NodePageShell", () => {
     expect(screen.queryByText("No data available.")).toBeNull();
   });
 
-  it("shows 405 guidance with docs link for ProxyError", () => {
+  it("shows a calm 'not available' note for 405 (keeps the section title)", () => {
     render(
       <NodePageShell
         title="NAT Masquerade"
@@ -141,16 +141,15 @@ describe("NodePageShell", () => {
       </NodePageShell>,
     );
 
-    expect(screen.getByText("Method Not Allowed")).toBeTruthy();
-    expect(screen.getByText("This endpoint does not support read (GET) requests.")).toBeTruthy();
-    expect(screen.getByText(/Check the dawos-agent documentation/)).toBeTruthy();
-    const link = screen.getByText("View documentation");
-    expect(link).toBeTruthy();
-    expect(link.closest("a")?.getAttribute("href")).toContain("dawos-agent");
-    expect(link.closest("a")?.getAttribute("target")).toBe("_blank");
+    // Title preserved, calm muted note, no alarming message, no retry.
+    expect(screen.getByText("NAT Masquerade")).toBeTruthy();
+    expect(screen.getByText(/Not available on this node/)).toBeTruthy();
+    expect(screen.queryByText("Method Not Allowed")).toBeNull();
+    expect(screen.queryByText("View documentation")).toBeNull();
+    expect(screen.queryByText("Retry")).toBeNull();
   });
 
-  it("shows 404 guidance for missing service", () => {
+  it("shows a calm 'not available' note for 404 missing service", () => {
     render(
       <NodePageShell
         title="Traffic"
@@ -161,9 +160,9 @@ describe("NodePageShell", () => {
       </NodePageShell>,
     );
 
-    expect(screen.getByText("This feature is not available on the node.")).toBeTruthy();
-    expect(screen.getByText(/service may not be installed/)).toBeTruthy();
-    expect(screen.getByText("View documentation")).toBeTruthy();
+    expect(screen.getByText("Traffic")).toBeTruthy();
+    expect(screen.getByText(/Not available on this node/)).toBeTruthy();
+    expect(screen.queryByText("View documentation")).toBeNull();
   });
 
   it("shows 502 guidance for unreachable node", () => {

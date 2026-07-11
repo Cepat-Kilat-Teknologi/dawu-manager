@@ -2,32 +2,19 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw, ExternalLink, Info } from "lucide-react";
+import { AlertCircle, RefreshCw, Info } from "lucide-react";
 import { SkeletonTable } from "@/components/shared/skeleton-blocks";
 import { ProxyError } from "@/hooks/use-node-proxy";
-
-const DOCS_URL = "https://cepat-kilat-teknologi.github.io/dawos-agent/";
 
 /**
  * Build a user-friendly guidance message based on the HTTP error status code.
  * Returns null for generic errors where no specific guidance applies.
+ * (404/405 are handled separately as a calm "not available" note.)
  */
-function getErrorGuidance(error: Error): { message: string; hint: string; docsPath?: string } | null {
+function getErrorGuidance(error: Error): { message: string; hint: string } | null {
   if (!(error instanceof ProxyError)) return null;
 
   switch (error.status) {
-    case 405:
-      return {
-        message: "This endpoint does not support read (GET) requests.",
-        hint: "It may require a specific action (POST/PUT/DELETE) through a form or button. Check the dawos-agent documentation for supported methods.",
-        docsPath: "api/",
-      };
-    case 404:
-      return {
-        message: "This feature is not available on the node.",
-        hint: "The required service may not be installed or the endpoint is not supported by this dawos-agent version.",
-        docsPath: "installation/",
-      };
     case 502:
     case 504:
       return {
@@ -93,6 +80,26 @@ export function NodePageShell({
   }
 
   if (error) {
+    // Feature genuinely not supported by this agent (404) or wrong method
+    // (405) — render a calm, muted note instead of an alarming error card.
+    if (
+      error instanceof ProxyError &&
+      (error.status === 404 || error.status === 405)
+    ) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-muted-foreground">{title}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center gap-2 pb-6 text-sm text-muted-foreground">
+            <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Not available on this node — this feature isn’t supported by the
+            dawos-agent here.
+          </CardContent>
+        </Card>
+      );
+    }
+
     const guidance = getErrorGuidance(error);
     return (
       <Card>
@@ -106,16 +113,6 @@ export function NodePageShell({
                 {guidance.message}
               </div>
               <p className="text-xs text-muted-foreground">{guidance.hint}</p>
-              {guidance.docsPath && (
-                <a
-                  href={`${DOCS_URL}${guidance.docsPath}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  View documentation <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
             </div>
           )}
           {onRetry && (
