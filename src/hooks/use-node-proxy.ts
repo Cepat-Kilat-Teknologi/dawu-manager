@@ -134,15 +134,22 @@ export function useNodeProxyMutation<TBody = unknown, TResponse = unknown>(
       return res.json();
     },
     onSuccess: () => {
-      // Invalidate specified paths and the base path
-      const pathsToInvalidate = [path.split("/")[0], ...invalidates];
-      const unique = [...new Set(pathsToInvalidate)];
-      for (const p of unique) {
-        queryClient.invalidateQueries({
-          queryKey: ["node-proxy", nodeId, p],
-          exact: false,
-        });
-      }
+      // Prefix-aware invalidation. TanStack's partial match is element-wise, so
+      // a queryKey filter of ["node-proxy", id, "monitoring"] does NOT match the
+      // query ["node-proxy", id, "monitoring/status"]. We instead match by the
+      // FIRST path segment, so a mutation on "monitoring/configure" (or an
+      // explicit invalidates:["monitoring"]) refreshes every query in that
+      // module — "monitoring/status" AND "monitoring/metrics".
+      const prefixes = new Set(
+        [path, ...invalidates].map((p) => p.split("/")[0]),
+      );
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          if (key[0] !== "node-proxy" || key[1] !== nodeId) return false;
+          return prefixes.has(String(key[2] ?? "").split("/")[0]);
+        },
+      });
       onSuccess?.();
     },
   });

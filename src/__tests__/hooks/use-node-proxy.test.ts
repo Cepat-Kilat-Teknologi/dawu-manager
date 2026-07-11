@@ -265,4 +265,55 @@ describe("useNodeProxyMutation", () => {
       body: undefined,
     });
   });
+
+  it("invalidates queries prefix-aware by first path segment", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    // Seed a spread of cached queries.
+    queryClient.setQueryData(["node-proxy", "n1", "monitoring/status"], { a: 1 });
+    queryClient.setQueryData(["node-proxy", "n1", "monitoring/metrics"], { b: 2 });
+    queryClient.setQueryData(["node-proxy", "n1", "network/routes"], { c: 3 });
+    queryClient.setQueryData(["node-proxy", "n1", "dhcp/status"], { d: 4 });
+    queryClient.setQueryData(["node-proxy", "n2", "monitoring/status"], { e: 5 });
+    queryClient.setQueryData(["other-cache"], { f: 6 });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({}),
+    } as Response);
+
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const { result } = renderHook(
+      // path segment "monitoring" + explicit cross-module invalidates ["network"]
+      () =>
+        useNodeProxyMutation("n1", "monitoring/configure", {
+          invalidates: ["network"],
+        }),
+      { wrapper },
+    );
+    result.current.mutate({});
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const invalidated = (key: unknown[]) =>
+      queryClient.getQueryState(key)?.isInvalidated;
+
+    // Same module as the mutation path — both refresh.
+    expect(invalidated(["node-proxy", "n1", "monitoring/status"])).toBe(true);
+    expect(invalidated(["node-proxy", "n1", "monitoring/metrics"])).toBe(true);
+    // Cross-module via explicit invalidates.
+    expect(invalidated(["node-proxy", "n1", "network/routes"])).toBe(true);
+    // Unrelated module on the same node — untouched.
+    expect(invalidated(["node-proxy", "n1", "dhcp/status"])).toBe(false);
+    // Same module but a different node — untouched.
+    expect(invalidated(["node-proxy", "n2", "monitoring/status"])).toBe(false);
+    // Non-node-proxy cache — untouched.
+    expect(invalidated(["other-cache"])).toBe(false);
+  });
 });
