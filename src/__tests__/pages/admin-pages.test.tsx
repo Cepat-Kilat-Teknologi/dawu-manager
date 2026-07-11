@@ -25,7 +25,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 import UsersPage from "@/app/(dashboard)/users/page";
-import AuditPage from "@/app/(dashboard)/audit/page";
 import SettingsPage from "@/app/(dashboard)/settings/page";
 
 describe("Admin placeholder pages", () => {
@@ -36,14 +35,6 @@ describe("Admin placeholder pages", () => {
     expect(screen.getByText("Users")).toBeInTheDocument();
     expect(screen.getByText("Coming Soon")).toBeInTheDocument();
     expect(mockRequireAuth).toHaveBeenCalledWith("admin");
-  });
-
-  it("AuditPage renders Coming Soon", async () => {
-    mockRequireAuth.mockResolvedValue({ user: { role: "admin" } });
-    const jsx = await AuditPage();
-    render(jsx);
-    expect(screen.getByText("Audit Log")).toBeInTheDocument();
-    expect(screen.getByText("Coming Soon")).toBeInTheDocument();
   });
 
   it("SettingsPage renders Coming Soon", async () => {

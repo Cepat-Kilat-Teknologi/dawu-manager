@@ -1,39 +1,32 @@
 import { requireAuth } from "@/lib/auth-guard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Construction } from "lucide-react";
+import { prisma } from "@/lib/db";
+import { ActivityFeed } from "@/components/activity/activity-feed";
+
+export const dynamic = "force-dynamic";
 
 /**
- * Audit log page (admin-only).
- * Currently a placeholder — full audit log viewer will be implemented in a future phase.
+ * Audit / Activity page (admin-only).
+ * A live, cross-node activity timeline backed by the AuditLog — every proxy
+ * mutation and node CRUD is recorded. Auto-refreshes so a NOC operator sees
+ * fleet-wide operator activity without reloading.
  */
 export default async function AuditPage() {
   await requireAuth("admin");
 
+  const nodes = await prisma.node.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-        <p className="text-muted-foreground">
-          Track user actions and system events.
+        <h1 className="text-2xl">Activity</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Live audit trail of every operator action across your nodes.
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Construction className="h-4 w-4 text-amber-500" aria-hidden="true" />
-            Coming Soon
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground/40 mb-4" aria-hidden="true" />
-            <p className="text-sm text-muted-foreground max-w-sm">
-              The audit log viewer will display a searchable history of all node
-              operations, user logins, and configuration changes.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <ActivityFeed nodes={nodes} />
     </div>
   );
 }
