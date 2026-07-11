@@ -166,7 +166,7 @@ throughput, jumlah node online/degraded/offline, top node by load.
 | P1c | Guardrail aksi destruktif | Kecil–sedang | Tinggi | ✅ Selesai (`6e0bdfe`) — config/apply, firewall/save, service restart |
 | P2a | Live event feed (feed aktivitas) | Sedang | Tinggi | ✅ Selesai (`d53134e`) — `/audit`, poll AuditLog* |
 | P2b | Alert rules & history | Besar | Sangat tinggi | ✅ Selesai (`d71c320`) — `/alerts`, rules CRUD + evaluator + webhook |
-| P3 | Sisa ~50 write endpoint | Besar (bertahap) | Sedang–tinggi | ⏭️ Ditunda (butuh perbaikan dawos-agent) |
+| P3 | ~50 write endpoint (7 grup) | Besar (bertahap) | Sedang–tinggi | ✅ Selesai — bulk/dns/firewall/scheduler/zone/vrrp/hooks; 5 gap dawos-agent tercatat di `docs/DAWOS_AGENT_GAPS.md` |
 | P4a | Operasi lintas-node | Besar | Tinggi | ⬜ Belum |
 | P4b | Audit trail | Sedang | Sedang–tinggi | ✅ Selesai — filter by user/node/action/date-range + CSV export |
 | P4c | Dashboard overview agregat | Sedang | Sedang–tinggi | ✅ Selesai — live fleet stats, top nodes by load, graceful degradation |
