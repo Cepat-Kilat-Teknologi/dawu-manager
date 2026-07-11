@@ -116,7 +116,9 @@ function mockPaths(opts: {
   });
 }
 
-import SessionsPage from "@/app/(dashboard)/nodes/[nodeId]/sessions/page";
+import SessionsPage, {
+  parseUsernames,
+} from "@/app/(dashboard)/nodes/[nodeId]/sessions/page";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -337,5 +339,198 @@ describe("SessionsPage states", () => {
     render(<SessionsPage />);
     fireEvent.click(screen.getByText("Refresh"));
     expect(refetch).toHaveBeenCalled();
+  });
+});
+
+describe("parseUsernames", () => {
+  it("splits, trims, deduplicates and filters empty lines", () => {
+    expect(parseUsernames("alice\n bob \nalice\n\ncharlie\n")).toEqual([
+      "alice",
+      "bob",
+      "charlie",
+    ]);
+  });
+
+  it("returns empty array for blank input", () => {
+    expect(parseUsernames("")).toEqual([]);
+    expect(parseUsernames("  \n  \n  ")).toEqual([]);
+  });
+});
+
+describe("SessionsPage bulk operations", () => {
+  it("renders the bulk operations card with subscriber count", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    expect(screen.getByText("Bulk Operations")).toBeTruthy();
+    expect(screen.getByText("0 subscriber(s) selected")).toBeTruthy();
+
+    const textarea = screen.getByLabelText("Usernames (one per line)");
+    fireEvent.change(textarea, { target: { value: "alice\nbob" } });
+    expect(screen.getByText("2 subscriber(s) selected")).toBeTruthy();
+  });
+
+  it("disables all bulk buttons when no usernames are entered", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    expect(
+      screen.getByText("Bulk Terminate").closest("button")?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Apply Rate Limit").closest("button")?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Restore Shaper").closest("button")?.disabled,
+    ).toBe(true);
+  });
+
+  it("disables Apply Rate Limit when rate is empty even with usernames", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "alice" },
+    });
+    expect(
+      screen.getByText("Bulk Terminate").closest("button")?.disabled,
+    ).toBe(false);
+    expect(
+      screen.getByText("Apply Rate Limit").closest("button")?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Restore Shaper").closest("button")?.disabled,
+    ).toBe(false);
+  });
+
+  it("enables Apply Rate Limit when both usernames and rate are provided", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "alice" },
+    });
+    fireEvent.change(screen.getByLabelText("Rate (for rate limit)"), {
+      target: { value: "5M/20M" },
+    });
+    expect(
+      screen.getByText("Apply Rate Limit").closest("button")?.disabled,
+    ).toBe(false);
+  });
+
+  it("opens terminate confirm and fires the bulk terminate mutation", async () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "alice\nbob" },
+    });
+    fireEvent.click(screen.getByText("Bulk Terminate"));
+    expect(screen.getByTestId("confirm-desc").textContent).toContain(
+      "disconnect 2 subscriber(s) immediately",
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+    expect(mutations.get("bulk/terminate")!.mutateAsync).toHaveBeenCalledWith({
+      usernames: ["alice", "bob"],
+    });
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  });
+
+  it("opens ratelimit confirm and fires the mutation with rate", async () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "alice" },
+    });
+    fireEvent.change(screen.getByLabelText("Rate (for rate limit)"), {
+      target: { value: "5M/20M" },
+    });
+    fireEvent.click(screen.getByText("Apply Rate Limit"));
+    expect(screen.getByTestId("confirm-desc").textContent).toContain(
+      "bandwidth allocation for 1 subscriber(s)",
+    );
+    expect(screen.getByTestId("confirm-desc").textContent).toContain(
+      "5M/20M",
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+    expect(mutations.get("bulk/ratelimit")!.mutateAsync).toHaveBeenCalledWith({
+      usernames: ["alice"],
+      rate: "5M/20M",
+    });
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  });
+
+  it("opens shaper-restore confirm and fires the mutation", async () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "charlie" },
+    });
+    fireEvent.click(screen.getByText("Restore Shaper"));
+    expect(screen.getByTestId("confirm-desc").textContent).toContain(
+      "restore RADIUS-assigned shaper settings for 1 subscriber(s)",
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+    });
+    expect(
+      mutations.get("bulk/shaper-restore")!.mutateAsync,
+    ).toHaveBeenCalledWith({ usernames: ["charlie"] });
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  });
+
+  it("closes the bulk confirm dialog on cancel", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "alice" },
+    });
+    fireEvent.click(screen.getByText("Bulk Terminate"));
+    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  });
+
+  it("shows toasts when bulk operations succeed", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    mutations.get("bulk/terminate")!.onSuccess!();
+    mutations.get("bulk/ratelimit")!.onSuccess!();
+    mutations.get("bulk/shaper-restore")!.onSuccess!();
+    expect(toast.success).toHaveBeenCalledWith("Sessions terminated");
+    expect(toast.success).toHaveBeenCalledWith("Rate limits applied");
+    expect(toast.success).toHaveBeenCalledWith("Shaper settings restored");
+  });
+
+  it("disables bulk buttons while their mutations are pending", () => {
+    pending.add("bulk/terminate");
+    pending.add("bulk/ratelimit");
+    pending.add("bulk/shaper-restore");
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    fireEvent.change(screen.getByLabelText("Usernames (one per line)"), {
+      target: { value: "alice" },
+    });
+    fireEvent.change(screen.getByLabelText("Rate (for rate limit)"), {
+      target: { value: "5M/20M" },
+    });
+    expect(
+      screen.getByText("Bulk Terminate").closest("button")?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Apply Rate Limit").closest("button")?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Restore Shaper").closest("button")?.disabled,
+    ).toBe(true);
+  });
+
+  it("renders the info note about entering usernames", () => {
+    mockPaths({ sessions: [], stats: null });
+    render(<SessionsPage />);
+    expect(
+      screen.getByText(
+        "Enter one PPPoE username per line. Actions apply to all listed subscribers at once.",
+      ),
+    ).toBeTruthy();
   });
 });

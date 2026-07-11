@@ -27,3 +27,14 @@ copes meanwhile. Maintained per the format in `PROMPT_P3_P4.md` section 4.
 | **Expected contract** | Numeric fields should be `number`, not `string`. |
 | **Severity** | Cosmetic — dawu-manager copes with `Number(value) \|\| 0`. |
 | **Coping strategy** | `Number()` coercion with `\|\| 0` fallback in the fleet overview aggregation. |
+
+## 3. Bulk endpoint request body schemas undocumented
+
+| Field | Detail |
+|-------|--------|
+| **Endpoint** | `POST bulk/terminate`, `POST bulk/ratelimit`, `POST bulk/shaper-restore` |
+| **Feature** | P3 Group 1: mass subscriber operations (sessions page) |
+| **What is wrong** | Undocumented. `docs/API_COVERAGE.md` lists the three endpoints but does not document their request body schemas (required fields, types, constraints). dawu-manager assumes `{ usernames: string[] }` for terminate and shaper-restore, and `{ usernames: string[], rate: string }` for ratelimit, inferred from the single-session equivalents (`sessions/terminate` takes `{ username }`, `traffic/ratelimit/{user}` takes `{ rate }`). |
+| **Expected contract** | Explicit request body documentation: `{ usernames: string[] }` for terminate/shaper-restore, `{ usernames: string[], rate: string }` for ratelimit — or whatever the agent actually accepts. |
+| **Severity** | Degrades feature — the bulk forms may send a wrong shape if the agent expects different field names or additional fields. |
+| **Coping strategy** | dawu-manager sends the inferred shapes. If the agent rejects them, the proxy surfaces the error as a toast. The forms are functional but unvalidated against real agent behavior until P1b live testing. |

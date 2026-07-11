@@ -8,6 +8,8 @@ import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-t
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { toast } from "sonner";
@@ -22,6 +24,7 @@ import {
   Cpu,
   Network,
   Clock,
+  Info,
 } from "lucide-react";
 import { formatValue } from "@/lib/utils";
 
@@ -68,6 +71,43 @@ function statValue(value: unknown): string {
   return String(value);
 }
 
+/** Parse a newline-separated list of usernames, trimming blanks and deduplicating. */
+export function parseUsernames(text: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of text.split("\n")) {
+    const u = raw.trim();
+    if (u && !seen.has(u)) {
+      seen.add(u);
+      result.push(u);
+    }
+  }
+  return result;
+}
+
+type BulkAction = "terminate" | "ratelimit" | "shaper-restore";
+
+const BULK_LABELS: Record<BulkAction, { title: string; confirmLabel: string; description: (count: number, rate: string) => string }> = {
+  terminate: {
+    title: "Bulk Terminate Sessions",
+    confirmLabel: "Terminate All",
+    description: (count) =>
+      `This will disconnect ${count} subscriber(s) immediately. Their PPPoE sessions will be forcefully terminated.`,
+  },
+  ratelimit: {
+    title: "Bulk Apply Rate Limit",
+    confirmLabel: "Apply Rate Limit",
+    description: (count, rate) =>
+      `This will change the bandwidth allocation for ${count} subscriber(s) to "${rate}". This takes effect immediately.`,
+  },
+  "shaper-restore": {
+    title: "Bulk Restore Shaper",
+    confirmLabel: "Restore All",
+    description: (count) =>
+      `This will restore RADIUS-assigned shaper settings for ${count} subscriber(s). Any manual rate-limit overrides will be removed.`,
+  },
+};
+
 /**
  * PPPoE sessions management page.
  * Displays all active sessions with search, terminate, and restart capabilities.
@@ -78,6 +118,49 @@ export default function SessionsPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
   const [search, setSearch] = useState("");
   const [terminateTarget, setTerminateTarget] = useState<string | null>(null);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkRate, setBulkRate] = useState("");
+  const [confirmAction, setConfirmAction] = useState<BulkAction | null>(null);
+
+  const parsedUsers = parseUsernames(bulkText);
+
+  const bulkTerminate = useNodeProxyMutation<{ usernames: string[] }>(
+    nodeId,
+    "bulk/terminate",
+    {
+      invalidates: ["sessions"],
+      onSuccess: () => toast.success("Sessions terminated"),
+    },
+  );
+
+  const bulkRatelimit = useNodeProxyMutation<{
+    usernames: string[];
+    rate: string;
+  }>(nodeId, "bulk/ratelimit", {
+    invalidates: ["sessions", "traffic"],
+    onSuccess: () => toast.success("Rate limits applied"),
+  });
+
+  const bulkShaperRestore = useNodeProxyMutation<{ usernames: string[] }>(
+    nodeId,
+    "bulk/shaper-restore",
+    {
+      invalidates: ["sessions", "traffic"],
+      onSuccess: () => toast.success("Shaper settings restored"),
+    },
+  );
+
+  async function handleBulkConfirm() {
+    const users = parsedUsers;
+    if (confirmAction === "terminate") {
+      await bulkTerminate.mutateAsync({ usernames: users });
+    } else if (confirmAction === "ratelimit") {
+      await bulkRatelimit.mutateAsync({ usernames: users, rate: bulkRate });
+    } else {
+      await bulkShaperRestore.mutateAsync({ usernames: users });
+    }
+    setConfirmAction(null);
+  }
 
   const { data, isLoading, error, refetch } = useNodeProxy<PPPoESession[]>(
     nodeId,
@@ -278,6 +361,103 @@ export default function SessionsPage() {
           }
         }}
       />
+
+      {/* Bulk Operations */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Bulk Operations</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              Enter one PPPoE username per line. Actions apply to all listed
+              subscribers at once.
+            </span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+            <div className="space-y-1.5">
+              <Label htmlFor="bulk-users">Usernames (one per line)</Label>
+              <textarea
+                id="bulk-users"
+                className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                placeholder={"user1\nuser2\nuser3"}
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bulk-rate">Rate (for rate limit)</Label>
+              <Input
+                id="bulk-rate"
+                placeholder="5M/20M"
+                className="font-mono"
+                value={bulkRate}
+                onChange={(e) => setBulkRate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {parsedUsers.length} subscriber(s) selected
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setConfirmAction("terminate")}
+              disabled={parsedUsers.length === 0 || bulkTerminate.isPending}
+            >
+              {bulkTerminate.isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Bulk Terminate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmAction("ratelimit")}
+              disabled={
+                parsedUsers.length === 0 ||
+                !bulkRate.trim() ||
+                bulkRatelimit.isPending
+              }
+            >
+              {bulkRatelimit.isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Apply Rate Limit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmAction("shaper-restore")}
+              disabled={parsedUsers.length === 0 || bulkShaperRestore.isPending}
+            >
+              {bulkShaperRestore.isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Restore Shaper
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {confirmAction && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => !open && setConfirmAction(null)}
+          title={BULK_LABELS[confirmAction].title}
+          description={BULK_LABELS[confirmAction].description(
+            parsedUsers.length,
+            bulkRate,
+          )}
+          confirmLabel={BULK_LABELS[confirmAction].confirmLabel}
+          variant="destructive"
+          onConfirm={handleBulkConfirm}
+        />
+      )}
     </div>
   );
 }
