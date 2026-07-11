@@ -59,7 +59,7 @@ export function Sidebar({ userRole = "viewer" }: SidebarProps) {
 
   return (
     <aside
-      className="hidden lg:flex lg:w-[260px] lg:flex-col lg:fixed lg:inset-y-0 border-r border-sidebar-border bg-sidebar"
+      className="hidden lg:flex lg:w-[260px] lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 border-r border-sidebar-border bg-sidebar"
       role="navigation"
       aria-label="Main navigation"
     >

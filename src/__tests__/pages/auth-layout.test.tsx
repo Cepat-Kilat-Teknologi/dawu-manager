@@ -53,7 +53,7 @@ describe("AuthLayout", () => {
     expect(screen.getByText("Login Form")).toBeTruthy();
   });
 
-  it("has centered flex layout classes", async () => {
+  it("has split-panel grid layout classes", async () => {
     mockAuth.mockResolvedValue(null);
 
     const jsx = await AuthLayout({
@@ -62,10 +62,25 @@ describe("AuthLayout", () => {
     const { container } = render(jsx);
 
     const wrapper = container.firstElementChild as HTMLElement;
-    expect(wrapper.className).toContain("flex");
+    expect(wrapper.className).toContain("grid");
     expect(wrapper.className).toContain("min-h-screen");
-    expect(wrapper.className).toContain("items-center");
-    expect(wrapper.className).toContain("justify-center");
+    expect(wrapper.className).toContain("lg:grid-cols-2");
+  });
+
+  it("renders the brand panel content", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const jsx = await AuthLayout({
+      children: <span>Content</span>,
+    });
+    render(jsx);
+
+    expect(
+      screen.getByRole("heading", { name: /Every BNG node/ }),
+    ).toBeTruthy();
+    expect(screen.getByText("Real-time visibility")).toBeTruthy();
+    expect(screen.getByText("Keys never leave the server")).toBeTruthy();
+    expect(screen.getByText("No more SSH hopping")).toBeTruthy();
   });
 
   it("renders children when session has no user", async () => {

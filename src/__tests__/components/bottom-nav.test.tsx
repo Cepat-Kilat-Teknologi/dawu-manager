@@ -76,9 +76,9 @@ describe("BottomNav", () => {
     );
   });
 
-  it("is hidden at lg and above", () => {
+  it("is hidden at md and above (mobile only)", () => {
     mockPathname.value = "/";
     const { container } = render(<BottomNav />);
-    expect(container.querySelector("nav")?.className).toContain("lg:hidden");
+    expect(container.querySelector("nav")?.className).toContain("md:hidden");
   });
 });

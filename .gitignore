@@ -72,3 +72,8 @@ prisma/migrations/**/migration_lock.toml
 
 # Standalone output (Next.js best practice)
 .next/standalone/
+
+# Browser/test tooling artifacts
+.playwright-mcp/
+test-results/
+redesign-*.png

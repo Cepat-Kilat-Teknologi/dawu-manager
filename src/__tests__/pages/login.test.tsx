@@ -54,6 +54,11 @@ describe("LoginPage", () => {
 
   it("submits form and redirects on success", async () => {
     mockLogin.mockResolvedValue({ ok: true });
+    // Login uses a full navigation (window.location.assign) instead of
+    // router.push so the SessionProvider cache is re-primed after sign-in.
+    const assignSpy = vi
+      .spyOn(window.location, "assign")
+      .mockImplementation(() => {});
 
     render(<LoginPage />);
 
@@ -70,9 +75,11 @@ describe("LoginPage", () => {
     });
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/");
-      expect(mockRefresh).toHaveBeenCalled();
+      expect(assignSpy).toHaveBeenCalledWith("/");
     });
+    expect(mockPush).not.toHaveBeenCalled();
+
+    assignSpy.mockRestore();
   });
 
   it("shows error on failed login", async () => {

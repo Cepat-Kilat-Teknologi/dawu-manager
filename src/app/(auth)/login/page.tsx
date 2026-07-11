@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +24,6 @@ import { AppLogo } from "@/components/shared/app-logo";
  * Displays toast notifications on success/failure and redirects to the dashboard on login.
  */
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -51,8 +49,11 @@ export default function LoginPage() {
         toast.success("Welcome back!", {
           description: "Redirecting to dashboard...",
         });
-        router.push("/");
-        router.refresh();
+        // Full navigation (not router.push) so the SessionProvider cache is
+        // re-primed — client-side nav keeps the stale null session and hides
+        // the header user menu until a manual reload.
+        window.location.assign("/");
+        return;
       }
     } catch {
       setError("An unexpected error occurred.");
@@ -65,16 +66,18 @@ export default function LoginPage() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="text-center space-y-2">
-        <AppLogo />
-        <CardTitle className="text-lg">Sign in</CardTitle>
+    <Card className="w-full rounded-2xl border-border/70 bg-card/70 shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <CardHeader className="space-y-3 text-center">
+        <div className="lg:hidden">
+          <AppLogo />
+        </div>
+        <CardTitle className="text-2xl">Sign in</CardTitle>
         <CardDescription>
           Enter your credentials to access the dashboard.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <FormAlert message={error} />
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -82,6 +85,7 @@ export default function LoginPage() {
               id="email"
               type="email"
               placeholder="admin@example.com"
+              className="h-11"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -95,6 +99,7 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
+              className="h-11"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -102,10 +107,17 @@ export default function LoginPage() {
               disabled={loading}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="press-scale h-11 w-full shadow-lg shadow-primary/25"
+            disabled={loading}
+          >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign in
+            {loading ? "Signing in…" : "Sign in"}
           </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Node API keys stay encrypted on the server — never in your browser.
+          </p>
         </form>
       </CardContent>
     </Card>

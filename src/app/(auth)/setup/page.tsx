@@ -79,16 +79,18 @@ export default function SetupPage() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="text-center space-y-2">
-        <AppLogo />
-        <CardTitle className="text-lg">Welcome to dawu-manager</CardTitle>
+    <Card className="w-full rounded-2xl border-border/70 bg-card/70 shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <CardHeader className="space-y-3 text-center">
+        <div className="lg:hidden">
+          <AppLogo />
+        </div>
+        <CardTitle className="text-2xl">Welcome to dawu-manager</CardTitle>
         <CardDescription>
           Create your administrator account to get started.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <FormAlert message={error} />
           <div className="space-y-2">
             <Label htmlFor="name">Full Name</Label>
@@ -143,9 +145,13 @@ export default function SetupPage() {
               disabled={loading}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button
+            type="submit"
+            className="press-scale h-11 w-full shadow-lg shadow-primary/25"
+            disabled={loading}
+          >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create Admin Account
+            {loading ? "Creating account…" : "Create Admin Account"}
           </Button>
         </form>
       </CardContent>

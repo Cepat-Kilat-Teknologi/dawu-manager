@@ -1,47 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import { useTheme } from "next-themes";
+import { Radio, RefreshCw, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useNodeSSE, type SSEStatus } from "@/hooks/use-node-sse";
 import { cn } from "@/lib/utils";
 
-/** One traffic sample streamed from dawos-agent /traffic/sse. */
-export interface TrafficSample {
-  /** Unix epoch (seconds or ms) or ISO string; defaults to "now" if absent. */
-  timestamp?: number | string;
-  /** Download rate in Mbps (accepts rx_mbps, download_mbps, or rx bytes/s). */
-  rx_mbps?: number;
-  download_mbps?: number;
-  rx_bps?: number;
-  /** Upload rate in Mbps (accepts tx_mbps, upload_mbps, or tx bytes/s). */
-  tx_mbps?: number;
-  upload_mbps?: number;
-  tx_bps?: number;
+/** One per-session sample inside an aggregate traffic event. */
+export interface SessionTraffic {
+  username: string;
+  ip: string;
+  rate_limit: string;
+  download_mbps: number;
+  upload_mbps: number;
 }
 
-/** Rolling buffer size — 5 minutes at 1 sample/second (spec). */
+/**
+ * Aggregate traffic event streamed from dawos-agent `/traffic/stream`.
+ * When the node has no active PPPoE sessions the agent emits
+ * `{ "error": "no active sessions" }` and closes the stream.
+ */
+export interface AggregateTrafficEvent {
+  sessions?: SessionTraffic[];
+  session_count?: number;
+  total_download_mbps?: number;
+  total_upload_mbps?: number;
+  timestamp?: string;
+  error?: string;
+}
+
+/** Rolling buffer size — 10 minutes at the agent's 2s default interval. */
 const MAX_POINTS = 300;
 
-/** Normalize a sample's timestamp into epoch milliseconds. */
-function toEpochMs(ts: TrafficSample["timestamp"]): number {
-  if (ts === undefined) return Date.now();
-  if (typeof ts === "string") return new Date(ts).getTime();
-  // Heuristic: values before year 2286 in seconds are < 1e10
-  return ts < 1e10 ? ts * 1000 : ts;
-}
-
-/** Extract download Mbps from whichever field the agent provides. */
-function rxMbps(s: TrafficSample): number {
-  return s.rx_mbps ?? s.download_mbps ?? (s.rx_bps !== undefined ? (s.rx_bps * 8) / 1e6 : 0);
-}
-
-/** Extract upload Mbps from whichever field the agent provides. */
-function txMbps(s: TrafficSample): number {
-  return s.tx_mbps ?? s.upload_mbps ?? (s.tx_bps !== undefined ? (s.tx_bps * 8) / 1e6 : 0);
-}
-
-/** Format a Mbps value for tooltips/axis: "125.4 Mbps". */
+/** Format a Mbps value for tooltips/labels: "125.4 Mbps". */
 export function formatMbps(value: number): string {
   return `${value.toFixed(1)} Mbps`;
 }
@@ -56,20 +49,38 @@ const STATUS_LABEL: Record<SSEStatus, string> = {
 
 interface TrafficChartProps {
   nodeId: string;
-  /** Chart height (default 380px; use "100%" inside sized containers). */
+  /** Chart height (default 380px). */
   height?: number | string;
   className?: string;
 }
 
 /**
- * Real-time traffic chart — streams download/upload rates from the node's
- * SSE endpoint through the BFF proxy and renders a two-series ECharts area
- * chart with a time axis, zoom slider, and PNG export.
+ * Real-time aggregate traffic chart — streams total download/upload Mbps
+ * for all active PPPoE sessions from the node's `/traffic/stream` SSE
+ * endpoint (via the BFF stream proxy) into a two-series ECharts area chart,
+ * plus a live "top sessions by throughput" list.
  *
- * Keeps a rolling 300-point buffer (~5 min at 1s interval) in a ref and
- * pushes updates through setOption, so React never re-renders per sample.
+ * Chart data lives in a ref and is pushed via setOption so React never
+ * re-renders per sample; only the lightweight session list uses state.
  */
-export function TrafficChart({ nodeId, height = 380, className }: TrafficChartProps) {
+export function TrafficChart(props: TrafficChartProps) {
+  // Remount the live subtree on retry so the EventSource reconnects fresh.
+  const [attempt, setAttempt] = useState(0);
+  return (
+    <LiveTrafficChart
+      key={attempt}
+      {...props}
+      onRetry={() => setAttempt((n) => n + 1)}
+    />
+  );
+}
+
+function LiveTrafficChart({
+  nodeId,
+  height = 380,
+  className,
+  onRetry,
+}: TrafficChartProps & { onRetry: () => void }) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme !== "light";
   const chartRef = useRef<ReactECharts | null>(null);
@@ -77,21 +88,41 @@ export function TrafficChart({ nodeId, height = 380, className }: TrafficChartPr
     rx: [],
     tx: [],
   });
+  const [streamEnded, setStreamEnded] = useState<string | null>(null);
+  const [sessionCount, setSessionCount] = useState<number | null>(null);
+  const [topSessions, setTopSessions] = useState<SessionTraffic[]>([]);
 
-  const { status } = useNodeSSE<TrafficSample>(nodeId, "traffic/sse", {
-    onMessage: (sample) => {
-      if (typeof sample !== "object" || sample === null) return;
-      const t = toEpochMs(sample.timestamp);
-      const buf = bufferRef.current;
-      buf.rx.push([t, rxMbps(sample)]);
-      buf.tx.push([t, txMbps(sample)]);
-      if (buf.rx.length > MAX_POINTS) buf.rx.splice(0, buf.rx.length - MAX_POINTS);
-      if (buf.tx.length > MAX_POINTS) buf.tx.splice(0, buf.tx.length - MAX_POINTS);
-      chartRef.current?.getEchartsInstance().setOption({
-        series: [{ data: buf.rx }, { data: buf.tx }],
-      });
+  const { status, close } = useNodeSSE<AggregateTrafficEvent>(
+    nodeId,
+    "traffic/stream",
+    {
+      enabled: streamEnded === null,
+      onMessage: (event) => {
+        if (typeof event !== "object" || event === null) return;
+        // Agent emits {error} and closes when no sessions are active —
+        // stop reconnect churn and show a friendly empty state instead.
+        if (event.error) {
+          close();
+          setStreamEnded(event.error);
+          return;
+        }
+        // Data events always carry an ISO timestamp (see dawos-agent
+        // aggregate_traffic_events); skip malformed payloads.
+        if (!event.timestamp) return;
+        const t = new Date(event.timestamp).getTime();
+        const buf = bufferRef.current;
+        buf.rx.push([t, event.total_download_mbps ?? 0]);
+        buf.tx.push([t, event.total_upload_mbps ?? 0]);
+        if (buf.rx.length > MAX_POINTS) buf.rx.splice(0, buf.rx.length - MAX_POINTS);
+        if (buf.tx.length > MAX_POINTS) buf.tx.splice(0, buf.tx.length - MAX_POINTS);
+        chartRef.current?.getEchartsInstance().setOption({
+          series: [{ data: buf.rx }, { data: buf.tx }],
+        });
+        setSessionCount(event.session_count ?? event.sessions?.length ?? 0);
+        setTopSessions((event.sessions ?? []).slice(0, 5));
+      },
     },
-  });
+  );
 
   const option = useMemo(() => {
     const text = dark ? "#FAFAFA" : "#09090B";
@@ -211,32 +242,93 @@ export function TrafficChart({ nodeId, height = 380, className }: TrafficChartPr
     });
   }, [option]);
 
-  return (
-    <div className={cn("relative content-fade-in", className)}>
-      {/* Live status indicator */}
-      <div className="absolute left-0 top-0 z-10 flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span
-          className={cn(
-            "h-2 w-2 rounded-full",
-            status === "open" && "bg-success animate-led-pulse",
-            status === "connecting" && "bg-warning",
-            status === "error" && "bg-warning animate-pulse",
-            status === "closed" && "bg-muted-foreground",
-          )}
-          aria-hidden="true"
-        />
-        {STATUS_LABEL[status]}
+  // Stream ended (no active sessions) — friendly empty state with retry.
+  if (streamEnded) {
+    return (
+      <div
+        className={cn(
+          "flex aspect-video w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed",
+          className,
+        )}
+      >
+        <Radio className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+        <div className="text-center">
+          <p className="text-sm font-medium">No active PPPoE sessions</p>
+          <p className="text-xs text-muted-foreground">
+            Traffic streaming starts as soon as a subscriber connects.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+          Retry
+        </Button>
       </div>
-      <ReactECharts
-        ref={chartRef}
-        option={option}
-        style={{ height, width: "100%" }}
-        opts={{ renderer: "canvas" }}
-        notMerge={false}
-        lazyUpdate
-        // Re-render axes/colors when theme flips; data lives in the ref
-        theme={undefined}
-      />
+    );
+  }
+
+  return (
+    <div className={cn("content-fade-in", className)}>
+      <div className="relative">
+        {/* Live status + session count */}
+        <div className="absolute left-0 top-0 z-10 flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                status === "open" && "bg-success animate-led-pulse",
+                status === "connecting" && "bg-warning",
+                status === "error" && "bg-warning animate-pulse",
+                status === "closed" && "bg-muted-foreground",
+              )}
+              aria-hidden="true"
+            />
+            {STATUS_LABEL[status]}
+          </span>
+          {sessionCount !== null && (
+            <span className="flex items-center gap-1">
+              <Users className="h-3 w-3" aria-hidden="true" />
+              {sessionCount} session{sessionCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        <ReactECharts
+          ref={chartRef}
+          option={option}
+          style={{ height, width: "100%" }}
+          opts={{ renderer: "canvas" }}
+          notMerge={false}
+          lazyUpdate
+        />
+      </div>
+
+      {/* Live top talkers */}
+      {topSessions.length > 0 && (
+        <div className="mt-4 overflow-hidden rounded-lg border">
+          <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+            Top sessions by download
+          </div>
+          <ul className="divide-y divide-border">
+            {topSessions.map((s) => (
+              <li
+                key={s.username}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{s.username}</span>
+                  <span className="block truncate font-mono text-xs text-muted-foreground">
+                    {s.ip}
+                    {s.rate_limit ? ` · ${s.rate_limit}` : ""}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right font-mono text-xs">
+                  <span className="block text-chart-1">↓ {formatMbps(s.download_mbps)}</span>
+                  <span className="block text-chart-2">↑ {formatMbps(s.upload_mbps)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

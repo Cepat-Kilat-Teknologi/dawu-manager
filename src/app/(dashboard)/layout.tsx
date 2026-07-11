@@ -36,7 +36,7 @@ export default async function DashboardLayout({
       <Sidebar userRole={session.user.role} />
       <div className="flex min-h-screen flex-1 flex-col">
         <Header />
-        <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col p-4 pb-24 md:p-6 lg:pb-6">
+        <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col p-4 pb-24 md:p-6 md:pb-6">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

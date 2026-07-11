@@ -93,7 +93,8 @@ export default function TrafficPage() {
         <div className="mb-4">
           <h2 className="text-lg">Real-time Traffic</h2>
           <p className="text-sm text-muted-foreground">
-            Live throughput — rolling 5-minute window, 1s resolution.
+            Live aggregate throughput of all active sessions — rolling window,
+            2s resolution.
           </p>
         </div>
         <TrafficChartLazy nodeId={nodeId} height={380} />
