@@ -159,17 +159,21 @@ throughput, jumlah node online/degraded/offline, top node by load.
 
 ## Peta prioritas (ringkas)
 
-| # | Item | Effort | Nilai | Risiko jika diabaikan |
-|---|------|--------|-------|----------------------|
-| P1a | Fix invalidasi prefix-aware | Kecil | Tinggi | Data tak refresh setelah mutasi (menyesatkan) |
-| P1b | Uji write di dawos-dev | Sedang | Tinggi | Fitur create/edit belum terbukti jalan |
-| P1c | Guardrail aksi destruktif | Kecil–sedang | Tinggi | Pelanggan terputus tak sengaja |
-| P2a | Live event feed (WS) | Sedang | Tinggi | Bukan "NOC tool" sungguhan |
-| P2b | Alert rules & history | Besar | Sangat tinggi | Tak ada monitoring proaktif |
-| P3 | Sisa ~50 write endpoint | Besar (bertahap) | Sedang–tinggi | Fitur management tak lengkap |
-| P4a | Operasi lintas-node | Besar | Tinggi | Nilai multi-node belum tergarap |
-| P4b | Audit trail | Sedang | Sedang–tinggi | Tak ada jejak untuk tim/audit |
-| P5 | Vuln + polish | Kecil | Sedang | Utang teknis menumpuk |
+| # | Item | Effort | Nilai | Status |
+|---|------|--------|-------|--------|
+| P1a | Fix invalidasi prefix-aware | Kecil | Tinggi | ✅ Selesai (`b60ed4d`) |
+| P1b | Uji write di dawos-dev | Sedang | Tinggi | ⏸️ Butuh Anda — deploy dawu-manager → dawos-dev + API key dev |
+| P1c | Guardrail aksi destruktif | Kecil–sedang | Tinggi | ✅ Selesai (`6e0bdfe`) — config/apply, firewall/save, service restart |
+| P2a | Live event feed (feed aktivitas) | Sedang | Tinggi | ✅ Selesai (`d53134e`) — `/audit`, poll AuditLog* |
+| P2b | Alert rules & history | Besar | Sangat tinggi | ✅ Selesai (`d71c320`) — `/alerts`, rules CRUD + evaluator + webhook |
+| P3 | Sisa ~50 write endpoint | Besar (bertahap) | Sedang–tinggi | ⏭️ Ditunda (butuh perbaikan dawos-agent) |
+| P4a | Operasi lintas-node | Besar | Tinggi | ⬜ Belum |
+| P4b | Audit trail | Sedang | Sedang–tinggi | ⬜ Belum |
+| P5 | Vuln + polish | Kecil | Sedang | ⬜ Belum |
+
+> \* P2a memakai polling AuditLog, bukan WebSocket `/ws/events`: WS tak bisa
+> di-proxy di Next standalone tanpa custom server, dan agent belum expose SSE
+> untuk event. Upgrade ke WS jadi item tersendiri jika dibutuhkan nanti.
 
 ---
 
