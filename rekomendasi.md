@@ -169,6 +169,7 @@ throughput, jumlah node online/degraded/offline, top node by load.
 | P3 | Sisa ~50 write endpoint | Besar (bertahap) | Sedang–tinggi | ⏭️ Ditunda (butuh perbaikan dawos-agent) |
 | P4a | Operasi lintas-node | Besar | Tinggi | ⬜ Belum |
 | P4b | Audit trail | Sedang | Sedang–tinggi | ✅ Selesai — filter by user/node/action/date-range + CSV export |
+| P4c | Dashboard overview agregat | Sedang | Sedang–tinggi | ✅ Selesai — live fleet stats, top nodes by load, graceful degradation |
 | P5 | Vuln + polish | Kecil | Sedang | ⬜ Belum |
 
 > \* P2a memakai polling AuditLog, bukan WebSocket `/ws/events`: WS tak bisa

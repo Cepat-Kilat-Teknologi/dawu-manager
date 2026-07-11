@@ -29,6 +29,10 @@ vi.mock("@/components/dashboard/node-card", () => ({
   ),
 }));
 
+vi.mock("@/components/dashboard/fleet-overview", () => ({
+  FleetOverview: () => <div data-testid="fleet-overview-component">Fleet Overview</div>,
+}));
+
 import DashboardPage from "@/app/(dashboard)/page";
 
 describe("DashboardPage", () => {
@@ -40,11 +44,13 @@ describe("DashboardPage", () => {
     render(jsx);
 
     expect(screen.getByText("Dashboard")).toBeTruthy();
-    expect(screen.getAllByText("No nodes configured").length).toBeGreaterThan(0);
+    expect(screen.getByText("No nodes configured")).toBeTruthy();
     expect(screen.getByText("Add your first node")).toBeTruthy();
+    // FleetOverview should NOT render when no nodes
+    expect(screen.queryByTestId("fleet-overview-component")).toBeNull();
   });
 
-  it("renders stats with node counts", async () => {
+  it("renders fleet overview and node cards when nodes exist", async () => {
     mockPrisma.node.findMany.mockResolvedValue([
       { id: "1", name: "bng-1", url: "http://1:8470", status: "online", location: null, lastSeen: new Date() },
       { id: "2", name: "bng-2", url: "http://2:8470", status: "online", location: null, lastSeen: new Date() },
@@ -53,10 +59,12 @@ describe("DashboardPage", () => {
     const jsx = await DashboardPage();
     render(jsx);
 
-    expect(screen.getByTestId("stat-total-nodes")).toBeTruthy();
-    expect(screen.getByTestId("stat-online")).toBeTruthy();
-    expect(screen.getByTestId("stat-offline")).toBeTruthy();
-    expect(screen.getByTestId("stat-degraded")).toBeTruthy();
+    // FleetOverview renders when nodes exist
+    expect(screen.getByTestId("fleet-overview-component")).toBeTruthy();
+
+    // Node cards render
+    const cards = screen.getAllByTestId("node-card");
+    expect(cards).toHaveLength(3);
   });
 
   it("renders node cards for each node", async () => {
@@ -73,54 +81,22 @@ describe("DashboardPage", () => {
     expect(screen.getByText("bng-2")).toBeTruthy();
   });
 
-  it("shows correct availability percentage", async () => {
-    mockPrisma.node.findMany.mockResolvedValue([
-      { id: "1", name: "n1", url: "http://1:8470", status: "online", location: null, lastSeen: new Date() },
-      { id: "2", name: "n2", url: "http://2:8470", status: "offline", location: null, lastSeen: null },
-    ]);
-    const jsx = await DashboardPage();
-    render(jsx);
-
-    // 1 of 2 online = 50% availability
-    expect(screen.getByText("50% availability")).toBeTruthy();
-  });
-
-  it("shows degraded count", async () => {
-    mockPrisma.node.findMany.mockResolvedValue([
-      { id: "1", name: "n1", url: "http://1:8470", status: "degraded", location: null, lastSeen: new Date() },
-    ]);
-    const jsx = await DashboardPage();
-    render(jsx);
-
-    expect(screen.getByText("Partial service")).toBeTruthy();
-  });
-
-  it("shows healthy messages when no offline/degraded", async () => {
-    mockPrisma.node.findMany.mockResolvedValue([
-      { id: "1", name: "n1", url: "http://1:8470", status: "online", location: null, lastSeen: new Date() },
-    ]);
-    const jsx = await DashboardPage();
-    render(jsx);
-
-    expect(screen.getByText("All nodes healthy")).toBeTruthy();
-    expect(screen.getByText("No degraded nodes")).toBeTruthy();
-  });
-
-  it("shows no-nodes description for online stat", async () => {
+  it("shows page heading and description", async () => {
     mockPrisma.node.findMany.mockResolvedValue([]);
     const jsx = await DashboardPage();
     render(jsx);
 
-    expect(screen.getAllByText("No nodes configured").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Dashboard")).toBeTruthy();
+    expect(screen.getByText("Overview of all managed BNG nodes.")).toBeTruthy();
   });
 
-  it("shows needs attention for offline nodes", async () => {
+  it("shows Nodes section heading", async () => {
     mockPrisma.node.findMany.mockResolvedValue([
-      { id: "1", name: "n1", url: "http://1:8470", status: "offline", location: null, lastSeen: null },
+      { id: "1", name: "n1", url: "http://1:8470", status: "online", location: null, lastSeen: new Date() },
     ]);
     const jsx = await DashboardPage();
     render(jsx);
 
-    expect(screen.getByText("Needs attention")).toBeTruthy();
+    expect(screen.getByText("Nodes")).toBeTruthy();
   });
 });
