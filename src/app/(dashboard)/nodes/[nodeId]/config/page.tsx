@@ -148,7 +148,7 @@ export default function ConfigPage() {
               </Button>
               <Button
                 size="sm"
-                onClick={() => applyMutation.mutate({ content: draft })}
+                onClick={() => setConfirmAction("apply")}
                 disabled={applyMutation.isPending}
               >
                 {applyMutation.isPending ? (
@@ -258,17 +258,30 @@ export default function ConfigPage() {
       <ConfirmDialog
         open={confirmAction !== null}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={confirmAction === "rollback" ? "Rollback Configuration" : "Confirm Configuration"}
+        title={
+          confirmAction === "apply"
+            ? "Apply Configuration"
+            : confirmAction === "rollback"
+              ? "Rollback Configuration"
+              : "Confirm Configuration"
+        }
         description={
-          confirmAction === "rollback"
-            ? "This will revert to the previous configuration and may disconnect active sessions. Are you sure?"
-            : "Confirm the currently applied configuration so it persists past the guard window?"
+          confirmAction === "apply"
+            ? "This applies your edited configuration to accel-ppp under a guard timer; a bad apply can disconnect active sessions until it auto-rolls-back. Apply now?"
+            : confirmAction === "rollback"
+              ? "This will revert to the previous configuration and may disconnect active sessions. Are you sure?"
+              : "Confirm the currently applied configuration so it persists past the guard window?"
         }
         confirmLabel={confirmAction ?? "Confirm"}
-        variant={confirmAction === "rollback" ? "destructive" : "default"}
+        variant={confirmAction === "confirm" ? "default" : "destructive"}
         onConfirm={async () => {
-          if (confirmAction === "confirm") await confirmMutation.mutateAsync({});
-          else await rollbackMutation.mutateAsync({});
+          if (confirmAction === "apply") {
+            await applyMutation.mutateAsync({ content: draft });
+          } else if (confirmAction === "confirm") {
+            await confirmMutation.mutateAsync({});
+          } else {
+            await rollbackMutation.mutateAsync({});
+          }
         }}
       />
     </div>

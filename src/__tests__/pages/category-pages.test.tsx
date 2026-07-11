@@ -189,11 +189,13 @@ describe("ServicePage", () => {
     );
   });
 
-  it("opens restart confirm dialog with correct description", () => {
+  it("opens restart confirm dialog with an impact-explicit description", () => {
     mockUseNodeProxy.mockReturnValue(mockQuery({ data: fullServiceData }));
     render(<ServicePage />);
     fireEvent.click(screen.getByText("Restart"));
-    expect(screen.getByTestId("confirm-desc").textContent).toContain("restart");
+    expect(screen.getByTestId("confirm-desc").textContent).toContain(
+      "drops all active PPPoE sessions",
+    );
   });
 
   it("confirms shutdown dispatches shutdownMutation", async () => {

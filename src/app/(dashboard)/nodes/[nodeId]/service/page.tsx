@@ -151,10 +151,24 @@ export default function ServicePage() {
             ? "Graceful shutdown will stop accepting new sessions and wait for existing sessions to end. Are you sure?"
             : confirmAction === "stop"
               ? "Stopping the service will immediately disconnect all active PPPoE sessions. Are you sure?"
-              : `Are you sure you want to ${confirmAction} the accel-ppp service?`
+              : confirmAction === "restart"
+                ? "Restarting accel-ppp drops all active PPPoE sessions at once; subscribers reconnect only after it is back up. Continue?"
+                : `Are you sure you want to ${confirmAction} the accel-ppp service?`
         }
-        confirmLabel={confirmAction === "stop" || confirmAction === "shutdown" ? confirmAction : "Confirm"}
-        variant={confirmAction === "stop" || confirmAction === "shutdown" ? "destructive" : "default"}
+        confirmLabel={
+          confirmAction === "stop" ||
+          confirmAction === "shutdown" ||
+          confirmAction === "restart"
+            ? confirmAction
+            : "Confirm"
+        }
+        variant={
+          confirmAction === "stop" ||
+          confirmAction === "shutdown" ||
+          confirmAction === "restart"
+            ? "destructive"
+            : "default"
+        }
         onConfirm={async () => {
           if (confirmAction === "shutdown") {
             await shutdownMutation.mutateAsync({});

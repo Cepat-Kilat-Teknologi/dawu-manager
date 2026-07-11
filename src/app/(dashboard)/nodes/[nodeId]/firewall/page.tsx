@@ -8,6 +8,7 @@ import {
   ProxyError,
 } from "@/hooks/use-node-proxy";
 import { NodePageShell } from "@/components/node/node-page-shell";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -171,6 +172,7 @@ export default function FirewallPage() {
   const [filter, setFilter] = useState("");
   // Tracks whether the pending ruleset passed validation, to nudge validate-before-save.
   const [validated, setValidated] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
 
   const rules = useNodeProxy<{ raw_output: string; rules_count: number }>(
     nodeId,
@@ -258,7 +260,7 @@ export default function FirewallPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => saveMutation.mutate({})}
+              onClick={() => setConfirmSave(true)}
               disabled={saveMutation.isPending}
             >
               {saveMutation.isPending ? (
@@ -400,6 +402,18 @@ export default function FirewallPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={(open) => !open && setConfirmSave(false)}
+        title="Save Firewall Rules"
+        description="This persists the live nftables ruleset to disk so it survives a reboot. A wrong ruleset can lock operators or subscribers out of this BNG — validate first. Save now?"
+        confirmLabel="Save Rules"
+        onConfirm={async () => {
+          await saveMutation.mutateAsync({});
+          setConfirmSave(false);
+        }}
+      />
     </div>
   );
 }

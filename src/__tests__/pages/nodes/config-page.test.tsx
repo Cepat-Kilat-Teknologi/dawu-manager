@@ -148,7 +148,7 @@ describe("ConfigPage", () => {
     expect(screen.getByText("2 KB")).toBeTruthy();
   });
 
-  it("edits and applies content", () => {
+  it("edits and applies content through the apply confirmation", async () => {
     loaded();
     render(<ConfigPage />);
     fireEvent.click(screen.getByText("Edit"));
@@ -156,7 +156,10 @@ describe("ConfigPage", () => {
     expect(ta.value).toBe("[ppp]\nverbose=1");
     fireEvent.change(ta, { target: { value: "[ppp]\nverbose=5" } });
     fireEvent.click(screen.getByText("Save & Apply"));
-    expect(mutationMap.get("config/apply")!.mutate).toHaveBeenCalledWith({
+    // Apply is now gated behind an impact-explicit confirmation.
+    expect(screen.getByTestId("confirm-desc").textContent).toContain("guard timer");
+    await act(async () => fireEvent.click(screen.getByTestId("confirm-btn")));
+    expect(mutationMap.get("config/apply")!.mutateAsync).toHaveBeenCalledWith({
       content: "[ppp]\nverbose=5",
     });
   });

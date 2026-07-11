@@ -7,7 +7,7 @@
  * tiles (available data, 404/405 unavailable, non-unavailable errors, null).
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { toast } from "sonner";
 import "@/__tests__/ui-mocks";
 
@@ -37,6 +37,32 @@ vi.mock("@/hooks/use-node-proxy", async (importOriginal) => {
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ nodeId: "n1" }),
+}));
+
+// ConfirmDialog: render a clickable confirm button when open.
+vi.mock("@/components/shared/confirm-dialog", () => ({
+  ConfirmDialog: ({
+    open,
+    onConfirm,
+    description,
+    onOpenChange,
+  }: {
+    open: boolean;
+    onConfirm: () => Promise<void> | void;
+    description: string;
+    onOpenChange: (o: boolean) => void;
+  }) =>
+    open ? (
+      <div data-testid="confirm-dialog">
+        <span data-testid="confirm-desc">{description}</span>
+        <button data-testid="confirm-btn" onClick={() => onConfirm()}>
+          Confirm
+        </button>
+        <button data-testid="cancel-btn" onClick={() => onOpenChange(false)}>
+          Cancel
+        </button>
+      </div>
+    ) : null,
 }));
 
 import { ProxyError } from "@/hooks/use-node-proxy";
@@ -271,13 +297,27 @@ describe("FirewallPage", () => {
     expect(screen.getByText("Not available on this node")).toBeTruthy();
   });
 
-  it("fires the save mutation and invokes its onSuccess", () => {
+  it("saves rules after confirmation and invokes its onSuccess", async () => {
     withRulesAndSysctl(() => undefined);
     render(<FirewallPage />);
     fireEvent.click(screen.getByText("Save Rules"));
+    // Saving the ruleset is now gated behind an impact-explicit confirmation.
+    expect(screen.getByTestId("confirm-desc").textContent).toContain(
+      "persists the live nftables ruleset",
+    );
     const save = mutationMap.get("n1:firewall/save")!;
-    expect(save.mutate).toHaveBeenCalledWith({});
+    await act(async () => fireEvent.click(screen.getByTestId("confirm-btn")));
+    expect(save.mutateAsync).toHaveBeenCalledWith({});
     save.onSuccess!();
+  });
+
+  it("closes the save confirmation on cancel without saving", () => {
+    withRulesAndSysctl(() => undefined);
+    render(<FirewallPage />);
+    fireEvent.click(screen.getByText("Save Rules"));
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    expect(mutationMap.get("n1:firewall/save")!.mutateAsync).not.toHaveBeenCalled();
   });
 
   it("disables Save Rules while the mutation is pending", () => {
