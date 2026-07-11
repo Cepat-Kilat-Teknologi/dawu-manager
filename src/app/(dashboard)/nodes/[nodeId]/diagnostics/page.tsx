@@ -1,14 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useNodeProxy, useNodeProxyMutation } from "@/hooks/use-node-proxy";
 import { NodePageShell } from "@/components/node/node-page-shell";
 import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-table";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { RefreshCw, Play, Loader2 } from "lucide-react";
+import { RefreshCw, Play, Loader2, Trash2 } from "lucide-react";
 import { formatValue } from "@/lib/utils";
 
 interface DoctorCheck {
@@ -58,6 +62,13 @@ interface ConntrackEntry {
 export default function DiagnosticsPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
 
+  // Scheduler form state
+  const [jobName, setJobName] = useState("");
+  const [jobCommand, setJobCommand] = useState("");
+  const [jobInterval, setJobInterval] = useState("");
+  const [deleteJobName, setDeleteJobName] = useState("");
+  const [runJobName, setRunJobName] = useState("");
+
   // Doctor checks
   const doctor = useNodeProxy<DoctorCheck[]>(nodeId, "diagnostics/doctor", { extract: "checks" });
 
@@ -71,6 +82,71 @@ export default function DiagnosticsPage() {
       onSuccess: () => toast.success("Playbook started"),
     },
   );
+
+  // Scheduler mutations
+  const createJobMutation = useNodeProxyMutation<{
+    name: string;
+    command: string;
+    interval_seconds: number;
+    enabled: boolean;
+  }>(nodeId, "scheduler/jobs", {
+    invalidates: ["scheduler"],
+    onSuccess: () => {
+      toast.success("Scheduler job created");
+      setJobName("");
+      setJobCommand("");
+      setJobInterval("");
+    },
+  });
+
+  const deleteJobMutation = useNodeProxyMutation(
+    nodeId,
+    `scheduler/jobs/${encodeURIComponent(deleteJobName || "_")}`,
+    {
+      method: "DELETE",
+      invalidates: ["scheduler"],
+      onSuccess: () => {
+        toast.success("Scheduler job deleted");
+        setDeleteJobName("");
+      },
+    },
+  );
+
+  const runJobMutation = useNodeProxyMutation(
+    nodeId,
+    `scheduler/jobs/${encodeURIComponent(runJobName || "_")}/run`,
+    {
+      invalidates: ["scheduler"],
+      onSuccess: () => {
+        toast.success("Job executed successfully");
+        setRunJobName("");
+      },
+    },
+  );
+
+  function handleCreateJob() {
+    const name = jobName.trim();
+    const command = jobCommand.trim();
+    const interval = parseInt(jobInterval, 10);
+    if (!name) {
+      toast.error("Job name is required");
+      return;
+    }
+    if (!command) {
+      toast.error("Command is required");
+      return;
+    }
+    if (!jobInterval.trim() || isNaN(interval) || interval < 10) {
+      toast.error("Interval must be at least 10 seconds");
+      return;
+    }
+    createJobMutation.mutate({
+      name,
+      command,
+      interval_seconds: interval,
+      enabled: true,
+    });
+  }
 
   // Scheduler
   const scheduler = useNodeProxy<SchedulerJob[]>(nodeId, "scheduler/jobs", { extract: "jobs" });
@@ -150,6 +226,33 @@ export default function DiagnosticsPage() {
     },
     { header: "Last Run", accessorKey: "last_run" },
     { header: "Next Run", accessorKey: "next_run" },
+    {
+      header: "Action",
+      cell: (row) => (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setRunJobName(String(row.name ?? ""))}
+            disabled={runJobMutation.isPending}
+          >
+            {runJobMutation.isPending ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="mr-1 h-3.5 w-3.5" />
+            )}
+            Run
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDeleteJobName(String(row.name ?? ""))}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   const zoneColumns: ProxyColumn<Zone>[] = [
@@ -228,6 +331,57 @@ export default function DiagnosticsPage() {
           />
         </NodePageShell>
       </div>
+
+      {/* Create Scheduler Job */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Create Scheduler Job</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="job-name">Job Name</Label>
+              <Input
+                id="job-name"
+                placeholder="daily-backup"
+                value={jobName}
+                onChange={(e) => setJobName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="job-command">Command</Label>
+              <Input
+                id="job-command"
+                placeholder="/usr/bin/backup.sh"
+                className="font-mono"
+                value={jobCommand}
+                onChange={(e) => setJobCommand(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="job-interval">Interval (seconds)</Label>
+              <Input
+                id="job-interval"
+                type="number"
+                min={10}
+                placeholder="3600"
+                value={jobInterval}
+                onChange={(e) => setJobInterval(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleCreateJob}
+            disabled={createJobMutation.isPending}
+          >
+            {createJobMutation.isPending && (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            )}
+            Create Job
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* VRRP + DNS + Limits + Bulk */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -322,6 +476,25 @@ export default function DiagnosticsPage() {
               ))}
         </dl>
       </NodePageShell>
+
+      {/* Scheduler ConfirmDialogs */}
+      <ConfirmDialog
+        open={!!deleteJobName}
+        onOpenChange={() => setDeleteJobName("")}
+        title="Delete Scheduler Job"
+        description={`Permanently delete scheduler job "${deleteJobName}"? Scheduled executions will stop immediately.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteJobMutation.mutate({})}
+      />
+      <ConfirmDialog
+        open={!!runJobName}
+        onOpenChange={() => setRunJobName("")}
+        title="Run Scheduler Job"
+        description={`Execute scheduler job "${runJobName}" immediately? This triggers the job outside its regular schedule.`}
+        confirmLabel="Run"
+        onConfirm={() => runJobMutation.mutate({})}
+      />
     </div>
   );
 }

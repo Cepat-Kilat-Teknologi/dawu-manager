@@ -101,8 +101,9 @@ beforeEach(() => {
   mutationMap.clear();
   mockUseNodeProxy.mockReturnValue(mockQuery());
   mockUseNodeProxyMutation.mockImplementation(
-    (_nid: string, _path: string, opts?: { onSuccess?: () => void }) => {
-      const key = `${_nid}:${_path}`;
+    (_nid: string, _path: string, opts?: { onSuccess?: () => void; method?: string }) => {
+      const method = opts?.method;
+      const key = method ? `${_nid}:${method}:${_path}` : `${_nid}:${_path}`;
       if (!mutationMap.has(key)) {
         const m: CapturedMutation = {
           mutate: vi.fn(),
@@ -228,8 +229,9 @@ function mockMutationPending(pendingPath: string) {
   mutationMap.clear();
   capturedMutations.length = 0;
   mockUseNodeProxyMutation.mockImplementation(
-    (_nid: string, _path: string, opts?: { onSuccess?: () => void }) => {
-      const key = `${_nid}:${_path}`;
+    (_nid: string, _path: string, opts?: { onSuccess?: () => void; method?: string }) => {
+      const method = opts?.method;
+      const key = method ? `${_nid}:${method}:${_path}` : `${_nid}:${_path}`;
       if (!mutationMap.has(key)) {
         const m: CapturedMutation = {
           mutate: vi.fn(),
@@ -305,9 +307,9 @@ describe("isPending branch coverage", () => {
       }),
     );
     render(<DiagnosticsPage />);
-    // Run button should be disabled
-    const runBtn = screen.getByText("Run");
-    expect(runBtn.closest("button")?.disabled).toBe(true);
+    // Run button should be disabled — multiple "Run" buttons exist (playbook + scheduler)
+    const runBtns = screen.getAllByText("Run");
+    expect(runBtns[0].closest("button")?.disabled).toBe(true);
   });
 });
 

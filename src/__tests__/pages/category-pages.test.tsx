@@ -107,8 +107,9 @@ beforeEach(() => {
   mockUseNodeProxy.mockReturnValue(mockQuery());
   // Each unique (nodeId, path) pair returns a STABLE mock — survives re-renders
   mockUseNodeProxyMutation.mockImplementation(
-    (_nid: string, _path: string, opts?: { onSuccess?: () => void }) => {
-      const key = `${_nid}:${_path}`;
+    (_nid: string, _path: string, opts?: { onSuccess?: () => void; method?: string }) => {
+      const method = opts?.method;
+      const key = method ? `${_nid}:${method}:${_path}` : `${_nid}:${_path}`;
       if (!mutationMap.has(key)) {
         const m: CapturedMutation = {
           mutate: vi.fn(),
@@ -406,7 +407,7 @@ describe("DhcpPage DNS Forwarding", () => {
       target: { value: "5000" },
     });
     fireEvent.click(screen.getByText("Update Config"));
-    const mutation = mutationMap.get("n1:dns/forwarding/config")!;
+    const mutation = mutationMap.get("n1:PUT:dns/forwarding/config")!;
     expect(mutation.mutate).toHaveBeenCalledWith({
       servers: ["8.8.8.8", "1.1.1.1"],
       cache_size: 5000,
@@ -462,7 +463,7 @@ describe("DhcpPage DNS Forwarding", () => {
   it("calls onSuccess for DNS config update and flush", () => {
     fullDnsMock();
     render(<DhcpPage />);
-    mutationMap.get("n1:dns/forwarding/config")!.onSuccess!();
+    mutationMap.get("n1:PUT:dns/forwarding/config")!.onSuccess!();
     mutationMap.get("n1:dns/forwarding/flush")!.onSuccess!();
     expect(toast.success).toHaveBeenCalledWith(
       "DNS forwarding config updated",
@@ -482,7 +483,7 @@ describe("DhcpPage DNS Forwarding", () => {
 
   it("disables buttons and shows spinners while DNS mutations are pending", () => {
     // Pre-populate pending mutations before render
-    mutationMap.set("n1:dns/forwarding/config", {
+    mutationMap.set("n1:PUT:dns/forwarding/config", {
       mutate: vi.fn(),
       mutateAsync: vi.fn().mockResolvedValue({}),
       isPending: true,
@@ -717,7 +718,9 @@ describe("DiagnosticsPage", () => {
     fullDiagMock();
     render(<DiagnosticsPage />);
     expect(screen.getByText("Reset counters")).toBeTruthy();
-    fireEvent.click(screen.getByText("Run"));
+    // Multiple "Run" buttons exist (playbooks + scheduler) — first one is playbooks
+    const runButtons = screen.getAllByText("Run");
+    fireEvent.click(runButtons[0]);
     expect(capturedMutations[0].mutate).toHaveBeenCalledWith({ id: "Reset counters" });
   });
 
@@ -806,5 +809,280 @@ describe("DiagnosticsPage", () => {
     expect(screen.getByText("No scheduled jobs.")).toBeTruthy();
     expect(screen.getByText("No firewall zones defined.")).toBeTruthy();
     expect(screen.getByText("No conntrack entries.")).toBeTruthy();
+  });
+
+  // --- Scheduler CRUD + Run ---
+
+  describe("Scheduler job management", () => {
+    it("renders scheduler action buttons (Run + Delete)", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Each scheduler row has a Run + Trash button
+      // 3 total Run buttons: 1 playbook + 2 scheduler
+      const runButtons = screen.getAllByText("Run");
+      expect(runButtons.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("creates a scheduler job with valid input", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Job Name"), {
+        target: { value: "test-job" },
+      });
+      fireEvent.change(screen.getByLabelText("Command"), {
+        target: { value: "/usr/bin/test.sh" },
+      });
+      fireEvent.change(screen.getByLabelText("Interval (seconds)"), {
+        target: { value: "60" },
+      });
+      fireEvent.click(screen.getByText("Create Job"));
+      const createMut = mutationMap.get("n1:scheduler/jobs");
+      expect(createMut?.mutate).toHaveBeenCalledWith({
+        name: "test-job",
+        command: "/usr/bin/test.sh",
+        interval_seconds: 60,
+        enabled: true,
+      });
+    });
+
+    it("rejects create when job name is empty", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Command"), {
+        target: { value: "/bin/cmd" },
+      });
+      fireEvent.change(screen.getByLabelText("Interval (seconds)"), {
+        target: { value: "30" },
+      });
+      fireEvent.click(screen.getByText("Create Job"));
+      expect(toast.error).toHaveBeenCalledWith("Job name is required");
+    });
+
+    it("rejects create when command is empty", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Job Name"), {
+        target: { value: "my-job" },
+      });
+      fireEvent.change(screen.getByLabelText("Interval (seconds)"), {
+        target: { value: "30" },
+      });
+      fireEvent.click(screen.getByText("Create Job"));
+      expect(toast.error).toHaveBeenCalledWith("Command is required");
+    });
+
+    it("rejects create when interval is less than 10", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Job Name"), {
+        target: { value: "my-job" },
+      });
+      fireEvent.change(screen.getByLabelText("Command"), {
+        target: { value: "/bin/cmd" },
+      });
+      fireEvent.change(screen.getByLabelText("Interval (seconds)"), {
+        target: { value: "5" },
+      });
+      fireEvent.click(screen.getByText("Create Job"));
+      expect(toast.error).toHaveBeenCalledWith(
+        "Interval must be at least 10 seconds",
+      );
+    });
+
+    it("rejects create when interval is empty", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Job Name"), {
+        target: { value: "my-job" },
+      });
+      fireEvent.change(screen.getByLabelText("Command"), {
+        target: { value: "/bin/cmd" },
+      });
+      fireEvent.click(screen.getByText("Create Job"));
+      expect(toast.error).toHaveBeenCalledWith(
+        "Interval must be at least 10 seconds",
+      );
+    });
+
+    it("rejects create when interval is NaN", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Job Name"), {
+        target: { value: "my-job" },
+      });
+      fireEvent.change(screen.getByLabelText("Command"), {
+        target: { value: "/bin/cmd" },
+      });
+      fireEvent.change(screen.getByLabelText("Interval (seconds)"), {
+        target: { value: "abc" },
+      });
+      fireEvent.click(screen.getByText("Create Job"));
+      expect(toast.error).toHaveBeenCalledWith(
+        "Interval must be at least 10 seconds",
+      );
+    });
+
+    it("calls createJob onSuccess and clears form", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Fill form
+      fireEvent.change(screen.getByLabelText("Job Name"), {
+        target: { value: "will-clear" },
+      });
+      fireEvent.change(screen.getByLabelText("Command"), {
+        target: { value: "/bin/test" },
+      });
+      fireEvent.change(screen.getByLabelText("Interval (seconds)"), {
+        target: { value: "60" },
+      });
+      // Trigger onSuccess
+      const createMut = mutationMap.get("n1:scheduler/jobs");
+      createMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("Scheduler job created");
+    });
+
+    it("opens delete confirm dialog and deletes job", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+
+      // Click first trash button (should be for "Daily backup")
+      const dailyRow = screen.getByText("Daily backup").closest("tr") ?? screen.getByText("Daily backup").parentElement;
+      const deleteBtn = dailyRow?.querySelector("button:last-child");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+
+      // Confirm dialog should open
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      expect(screen.getByTestId("confirm-desc").textContent).toContain(
+        "Daily backup",
+      );
+
+      // Confirm delete
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+      const delMut = mutationMap.get(
+        "n1:DELETE:scheduler/jobs/Daily%20backup",
+      );
+      expect(delMut?.mutate).toHaveBeenCalled();
+    });
+
+    it("calls deleteJob onSuccess callback", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Trigger delete flow to register the mutation
+      const dailyRow = screen.getByText("Daily backup").closest("tr") ?? screen.getByText("Daily backup").parentElement;
+      const deleteBtn = dailyRow?.querySelector("button:last-child");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+      // Call onSuccess on the delete mutation
+      const delMut = mutationMap.get(
+        "n1:DELETE:scheduler/jobs/Daily%20backup",
+      );
+      delMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("Scheduler job deleted");
+    });
+
+    it("cancels delete dialog via cancel button", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const dailyRow = screen.getByText("Daily backup").closest("tr") ?? screen.getByText("Daily backup").parentElement;
+      const deleteBtn = dailyRow?.querySelector("button:last-child");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("cancel-btn"));
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    it("opens run confirm dialog and runs job", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Run buttons: [0]=playbook, [1]=scheduler "Daily backup", [2]=scheduler "Cleanup"
+      const runButtons = screen.getAllByText("Run");
+      fireEvent.click(runButtons[1]); // "Daily backup" run
+
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      expect(screen.getByTestId("confirm-desc").textContent).toContain(
+        "Daily backup",
+      );
+
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+      const runMut = mutationMap.get(
+        "n1:scheduler/jobs/Daily%20backup/run",
+      );
+      expect(runMut?.mutate).toHaveBeenCalled();
+    });
+
+    it("calls runJob onSuccess callback", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const runButtons = screen.getAllByText("Run");
+      fireEvent.click(runButtons[1]);
+      const runMut = mutationMap.get(
+        "n1:scheduler/jobs/Daily%20backup/run",
+      );
+      runMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("Job executed successfully");
+    });
+
+    it("cancels run dialog via cancel button", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const runButtons = screen.getAllByText("Run");
+      fireEvent.click(runButtons[1]);
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("cancel-btn"));
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    it("shows spinner on create button when isPending", () => {
+      // Pre-populate with isPending before render
+      mutationMap.set("n1:scheduler/jobs", {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+      });
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const createBtn = screen.getByText("Create Job").closest("button");
+      expect(createBtn?.disabled).toBe(true);
+    });
+
+    it("shows spinner on run button when isPending", () => {
+      mutationMap.set("n1:scheduler/jobs/_/run", {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+      });
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Run buttons should be disabled when isPending
+      const runButtons = screen.getAllByText("Run");
+      // Scheduler run buttons (index 1, 2) should be disabled
+      expect(runButtons[1].closest("button")?.disabled).toBe(true);
+    });
+
+    it("renders scheduler job with missing name gracefully", () => {
+      mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+        if (path === "scheduler/jobs") {
+          return mockQuery({
+            data: [
+              { id: "j3", name: undefined, schedule: "*/5 * * * *", enabled: true },
+            ],
+          });
+        }
+        if (path === "diagnostics/doctor") return mockQuery({ data: [] });
+        if (path === "playbooks") return mockQuery({ data: [] });
+        if (path === "firewall/zones") return mockQuery({ data: [] });
+        if (path === "conntrack/entries") return mockQuery({ data: [] });
+        return mockQuery({ data: {} });
+      });
+      render(<DiagnosticsPage />);
+      // Should render without crashing — name fallback to ""
+      expect(screen.getByText("*/5 * * * *")).toBeTruthy();
+      // Click Run button — exercises row.name ?? "" fallback
+      const runButtons = screen.getAllByText("Run");
+      fireEvent.click(runButtons[0]);
+      // Click Delete button — exercises row.name ?? "" fallback
+      const row = screen.getByText("*/5 * * * *").closest("tr") ?? screen.getByText("*/5 * * * *").parentElement;
+      const deleteBtn = row?.querySelector("button:last-child");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+    });
   });
 });
