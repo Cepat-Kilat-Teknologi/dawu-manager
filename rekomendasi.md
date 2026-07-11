@@ -168,7 +168,7 @@ throughput, jumlah node online/degraded/offline, top node by load.
 | P2b | Alert rules & history | Besar | Sangat tinggi | ✅ Selesai (`d71c320`) — `/alerts`, rules CRUD + evaluator + webhook |
 | P3 | Sisa ~50 write endpoint | Besar (bertahap) | Sedang–tinggi | ⏭️ Ditunda (butuh perbaikan dawos-agent) |
 | P4a | Operasi lintas-node | Besar | Tinggi | ⬜ Belum |
-| P4b | Audit trail | Sedang | Sedang–tinggi | ⬜ Belum |
+| P4b | Audit trail | Sedang | Sedang–tinggi | ✅ Selesai — filter by user/node/action/date-range + CSV export |
 | P5 | Vuln + polish | Kecil | Sedang | ⬜ Belum |
 
 > \* P2a memakai polling AuditLog, bukan WebSocket `/ws/events`: WS tak bisa

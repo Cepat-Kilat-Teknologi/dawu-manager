@@ -19,6 +19,7 @@ import {
   Server,
   Activity as ActivityIcon,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,12 @@ export interface ActivityNodeOption {
   name: string;
 }
 
+/** Options for the user filter dropdown. */
+export interface ActivityUserOption {
+  id: string;
+  name: string;
+}
+
 const TONE_DOT: Record<ActivityTone, string> = {
   create: "bg-success",
   update: "bg-primary",
@@ -50,24 +57,48 @@ const REFRESH_MS = 10_000;
 
 interface ActivityFeedProps {
   nodes: ActivityNodeOption[];
+  users: ActivityUserOption[];
+  actions: string[];
+}
+
+/** Build the query-param string shared by the feed fetch and CSV export. */
+function buildFilterParams(filters: {
+  nodeId: string;
+  userId: string;
+  action: string;
+  from: string;
+  to: string;
+}): string {
+  const params = new URLSearchParams();
+  if (filters.nodeId) params.set("nodeId", filters.nodeId);
+  if (filters.userId) params.set("userId", filters.userId);
+  if (filters.action) params.set("action", filters.action);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
+  return params.toString();
 }
 
 /**
  * Live, cross-node activity timeline. Polls /api/activity on an interval and
  * renders operator actions (session terminations, config applies, node CRUD…)
- * newest-first, with a node filter and free-text search. Auto-refreshes so a
- * NOC operator sees fleet activity without reloading.
+ * newest-first, with filters for node, user, action, and date range. Includes
+ * free-text search and CSV export. Auto-refreshes so a NOC operator sees fleet
+ * activity without reloading.
  */
-export function ActivityFeed({ nodes }: ActivityFeedProps) {
+export function ActivityFeed({ nodes, users, actions }: ActivityFeedProps) {
   const [nodeId, setNodeId] = useState("");
+  const [userId, setUserId] = useState("");
+  const [action, setAction] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
 
+  const qs = buildFilterParams({ nodeId, userId, action, from, to });
+
   const query = useQuery<{ items: ActivityItem[] }>({
-    queryKey: ["activity", nodeId],
+    queryKey: ["activity", nodeId, userId, action, from, to],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (nodeId) params.set("nodeId", nodeId);
-      const res = await fetch(`/api/activity?${params.toString()}`);
+      const res = await fetch(`/api/activity?${qs}`);
       if (!res.ok) throw new Error("Failed to load activity");
       return res.json();
     },
@@ -88,9 +119,15 @@ export function ActivityFeed({ nodes }: ActivityFeedProps) {
       })
     : items;
 
+  function handleExport() {
+    const exportQs = buildFilterParams({ nodeId, userId, action, from, to });
+    const sep = exportQs ? `?${exportQs}` : "";
+    window.location.href = `/api/activity/export${sep}`;
+  }
+
   return (
     <div className="space-y-4">
-      {/* Controls */}
+      {/* Controls row 1: live indicator + search + refresh + export */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span
@@ -111,6 +148,25 @@ export function ActivityFeed({ nodes }: ActivityFeedProps) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => query.refetch()}
+          disabled={query.isFetching}
+        >
+          <RefreshCw
+            className={cn("mr-1.5 h-3.5 w-3.5", query.isFetching && "animate-spin")}
+          />
+          Refresh
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExport}>
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          Export CSV
+        </Button>
+      </div>
+
+      {/* Controls row 2: filters */}
+      <div className="flex flex-wrap items-center gap-2">
         <select
           value={nodeId}
           onChange={(e) => setNodeId(e.target.value)}
@@ -124,17 +180,46 @@ export function ActivityFeed({ nodes }: ActivityFeedProps) {
             </option>
           ))}
         </select>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => query.refetch()}
-          disabled={query.isFetching}
+        <select
+          value={userId}
+          onChange={(e) => setUserId(e.target.value)}
+          aria-label="Filter by user"
+          className="h-9 rounded-md border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <RefreshCw
-            className={cn("mr-1.5 h-3.5 w-3.5", query.isFetching && "animate-spin")}
-          />
-          Refresh
-        </Button>
+          <option value="">All users</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={action}
+          onChange={(e) => setAction(e.target.value)}
+          aria-label="Filter by action"
+          className="h-9 rounded-md border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="">All actions</option>
+          {actions.map((a) => (
+            <option key={a} value={a}>
+              {formatActivity(a).label}
+            </option>
+          ))}
+        </select>
+        <Input
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          aria-label="From date"
+          className="h-9 w-auto"
+        />
+        <Input
+          type="date"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          aria-label="To date"
+          className="h-9 w-auto"
+        />
       </div>
 
       <Card>

@@ -26,6 +26,18 @@ describe("GET /api/activity", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 403 for non-admin users", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u2", name: "op", role: "operator" } });
+    const res = await GET(makeReq());
+    expect(res.status).toBe(403);
+  });
+
+  it("returns 403 when role is undefined (defaults to viewer)", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u3", name: "norole" } });
+    const res = await GET(makeReq());
+    expect(res.status).toBe(403);
+  });
+
   it("returns mapped activity items", async () => {
     mockAuth.mockResolvedValue(session);
     mockPrisma.auditLog.findMany.mockResolvedValue([
@@ -92,5 +104,67 @@ describe("GET /api/activity", () => {
     expect(mockPrisma.auditLog.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({ take: 100 }),
     );
+  });
+
+  it("filters by userId", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?userId=u5"));
+    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "u5" } }),
+    );
+  });
+
+  it("filters by action", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?action=node.create"));
+    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { action: "node.create" } }),
+    );
+  });
+
+  it("filters by date range (from only)", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?from=2026-07-01T00:00:00Z"));
+    const call = mockPrisma.auditLog.findMany.mock.calls[0][0];
+    expect(call.where.createdAt).toEqual({
+      gte: new Date("2026-07-01T00:00:00Z"),
+    });
+  });
+
+  it("filters by date range (to only)", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?to=2026-07-10T23:59:59Z"));
+    const call = mockPrisma.auditLog.findMany.mock.calls[0][0];
+    expect(call.where.createdAt).toEqual({
+      lte: new Date("2026-07-10T23:59:59Z"),
+    });
+  });
+
+  it("filters by date range (both from and to)", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?from=2026-07-01&to=2026-07-10"));
+    const call = mockPrisma.auditLog.findMany.mock.calls[0][0];
+    expect(call.where.createdAt).toEqual({
+      gte: new Date("2026-07-01"),
+      lte: new Date("2026-07-10"),
+    });
+  });
+
+  it("ignores invalid date strings", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?from=not-a-date&to=also-bad"));
+    const call = mockPrisma.auditLog.findMany.mock.calls[0][0];
+    expect(call.where.createdAt).toBeUndefined();
+  });
+
+  it("combines multiple filters", async () => {
+    mockAuth.mockResolvedValue(session);
+    await GET(makeReq("?nodeId=n1&userId=u2&action=node.create"));
+    const call = mockPrisma.auditLog.findMany.mock.calls[0][0];
+    expect(call.where).toEqual({
+      nodeId: "n1",
+      userId: "u2",
+      action: "node.create",
+    });
   });
 });

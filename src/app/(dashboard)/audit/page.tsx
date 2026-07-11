@@ -8,15 +8,29 @@ export const dynamic = "force-dynamic";
  * Audit / Activity page (admin-only).
  * A live, cross-node activity timeline backed by the AuditLog — every proxy
  * mutation and node CRUD is recorded. Auto-refreshes so a NOC operator sees
- * fleet-wide operator activity without reloading.
+ * fleet-wide operator activity without reloading. Filters by user, node,
+ * action, and date range with CSV export.
  */
 export default async function AuditPage() {
   await requireAuth("admin");
 
-  const nodes = await prisma.node.findMany({
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
+  const [nodes, users, actionRows] = await Promise.all([
+    prisma.node.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.auditLog.findMany({
+      select: { action: true },
+      distinct: ["action"],
+      orderBy: { action: "asc" },
+    }),
+  ]);
+
+  const actions = actionRows.map((r) => r.action);
 
   return (
     <div className="space-y-6">
@@ -26,7 +40,7 @@ export default async function AuditPage() {
           Live audit trail of every operator action across your nodes.
         </p>
       </div>
-      <ActivityFeed nodes={nodes} />
+      <ActivityFeed nodes={nodes} users={users} actions={actions} />
     </div>
   );
 }
