@@ -2,10 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_VERSION } from "@/lib/constants";
-import { mainNavItems, type NavItem } from "@/config/navigation";
-import { Server } from "lucide-react";
+import {
+  mainNavItems,
+  nodeNavSections,
+  type NavItem,
+} from "@/config/navigation";
+import { ArrowLeft, Server } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 /**
@@ -13,10 +18,9 @@ import { Separator } from "@/components/ui/separator";
  * Renders an icon, title, and optional badge count.
  * Uses the dedicated sidebar design tokens for proper spatial hierarchy.
  * @param item - Navigation item configuration (title, href, icon, badge)
- * @param pathname - Current URL pathname used to determine active state
+ * @param isActive - Whether this link matches the current route
  */
-function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
-  const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   const Icon = item.icon;
 
   return (
@@ -43,19 +47,111 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   );
 }
 
+/** Match /nodes/<id>/... but not /nodes/new — returns the node id or null. */
+export function nodeIdFromPathname(pathname: string): string | null {
+  const match = /^\/nodes\/([^/]+)/.exec(pathname);
+  if (!match || match[1] === "new") return null;
+  return match[1];
+}
+
+/** Status dot color per node status. */
+const STATUS_DOT: Record<string, string> = {
+  online: "bg-success animate-led-pulse",
+  degraded: "bg-warning",
+  offline: "bg-destructive",
+};
+
+/**
+ * Contextual sidebar content shown while inside a node's pages.
+ * Replaces the main navigation with the node's section navigation
+ * (Portainer-style) so sections never need horizontal scrolling.
+ */
+function NodeContextNav({ nodeId, pathname }: { nodeId: string; pathname: string }) {
+  const basePath = `/nodes/${nodeId}`;
+
+  const { data: node } = useQuery<{ name?: string; status?: string }>({
+    queryKey: ["node", nodeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/nodes/${nodeId}`);
+      if (!res.ok) throw new Error("Failed to load node");
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  return (
+    <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6" aria-label="Node navigation">
+      <Link
+        href="/nodes"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        All Nodes
+      </Link>
+
+      {/* Node identity */}
+      <div className="rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "h-2 w-2 shrink-0 rounded-full",
+              STATUS_DOT[node?.status ?? ""] ?? "bg-muted-foreground",
+            )}
+            aria-hidden="true"
+          />
+          {node?.name ? (
+            <span className="truncate text-sm font-semibold text-sidebar-foreground">
+              {node.name}
+            </span>
+          ) : (
+            <span className="skeleton-shimmer h-4 w-24" aria-hidden="true" />
+          )}
+        </div>
+      </div>
+
+      {/* Section groups */}
+      {nodeNavSections.map((section) => (
+        <div key={section.title}>
+          <p className="px-3 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider mb-2">
+            {section.title}
+          </p>
+          <div className="space-y-1">
+            {section.items.map((item) => {
+              const href = `${basePath}${item.href}`;
+              const isActive =
+                item.href === ""
+                  ? pathname === basePath
+                  : pathname.startsWith(href);
+              return (
+                <NavLink
+                  key={item.href}
+                  item={{ ...item, href }}
+                  isActive={isActive}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 interface SidebarProps {
   userRole?: string;
 }
 
 /**
- * Desktop sidebar navigation panel (hidden on mobile via `md:` breakpoint).
- * Renders the application logo, role-filtered nav sections from `mainNavItems`,
- * and a version footer. Fixed position on the left edge.
- * Uses dedicated sidebar design tokens for distinct visual hierarchy.
+ * Desktop sidebar navigation panel (hidden below lg via breakpoint classes).
+ * Shows the main app navigation by default; while inside a node's pages it
+ * swaps to that node's section navigation (back link, node identity, and
+ * grouped section links) so node sections read vertically instead of a
+ * horizontally scrolling tab bar.
  * @param userRole - Current user's role for filtering role-restricted nav items
  */
 export function Sidebar({ userRole = "viewer" }: SidebarProps) {
   const pathname = usePathname();
+  const nodeId = nodeIdFromPathname(pathname);
 
   return (
     <aside
@@ -74,29 +170,38 @@ export function Sidebar({ userRole = "viewer" }: SidebarProps) {
         </div>
       </div>
 
-      {/* Nav sections */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
-        {mainNavItems.map((section) => {
-          const visibleItems = section.items.filter(
-            (item) => !item.roles || item.roles.includes(userRole),
-          );
+      {/* Nav — node context swaps in the node's section navigation */}
+      {nodeId ? (
+        <NodeContextNav nodeId={nodeId} pathname={pathname} />
+      ) : (
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+          {mainNavItems.map((section) => {
+            const visibleItems = section.items.filter(
+              (item) => !item.roles || item.roles.includes(userRole),
+            );
 
-          if (visibleItems.length === 0) return null;
+            if (visibleItems.length === 0) return null;
 
-          return (
-            <div key={section.title}>
-              <p className="px-3 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider mb-2">
-                {section.title}
-              </p>
-              <div className="space-y-1">
-                {visibleItems.map((item) => (
-                  <NavLink key={item.href} item={item} pathname={pathname} />
-                ))}
+            return (
+              <div key={section.title}>
+                <p className="px-3 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider mb-2">
+                  {section.title}
+                </p>
+                <div className="space-y-1">
+                  {visibleItems.map((item) => {
+                    const isActive =
+                      pathname === item.href ||
+                      (item.href !== "/" && pathname.startsWith(item.href));
+                    return (
+                      <NavLink key={item.href} item={item} isActive={isActive} />
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </nav>
+            );
+          })}
+        </nav>
+      )}
 
       <Separator className="bg-sidebar-border" />
 

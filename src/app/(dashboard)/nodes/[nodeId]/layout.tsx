@@ -89,8 +89,9 @@ export default async function NodeLayout({
         </div>
       </div>
 
-      {/* Sub-navigation */}
-      <div className="px-4 md:px-6">
+      {/* Sub-navigation — mobile/tablet only; on desktop the main sidebar
+          swaps to the node's section navigation (no horizontal scrolling) */}
+      <div className="px-4 md:px-6 lg:hidden">
         <NodeSubNav nodeId={nodeId} />
       </div>
 
