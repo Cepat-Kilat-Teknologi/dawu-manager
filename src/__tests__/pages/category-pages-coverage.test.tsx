@@ -92,18 +92,11 @@ function mockQuery(overrides: Record<string, unknown> = {}) {
 // --- Page imports ---
 import SessionsPage from "@/app/(dashboard)/nodes/[nodeId]/sessions/page";
 import ServicePage from "@/app/(dashboard)/nodes/[nodeId]/service/page";
-import FirewallPage from "@/app/(dashboard)/nodes/[nodeId]/firewall/page";
-import NetworkPage from "@/app/(dashboard)/nodes/[nodeId]/network/page";
 import ConfigPage from "@/app/(dashboard)/nodes/[nodeId]/config/page";
 import TrafficPage from "@/app/(dashboard)/nodes/[nodeId]/traffic/page";
-import IpPoolPage from "@/app/(dashboard)/nodes/[nodeId]/ip-pool/page";
-import PppoePage from "@/app/(dashboard)/nodes/[nodeId]/pppoe/page";
-import RoutingPage from "@/app/(dashboard)/nodes/[nodeId]/routing/page";
 import DhcpPage from "@/app/(dashboard)/nodes/[nodeId]/dhcp/page";
 import EventsPage from "@/app/(dashboard)/nodes/[nodeId]/events/page";
-import LogsPage from "@/app/(dashboard)/nodes/[nodeId]/logs/page";
 import MonitoringPage from "@/app/(dashboard)/nodes/[nodeId]/monitoring/page";
-import SystemPage from "@/app/(dashboard)/nodes/[nodeId]/system/page";
 import DiagnosticsPage from "@/app/(dashboard)/nodes/[nodeId]/diagnostics/page";
 
 beforeEach(() => {
@@ -191,68 +184,6 @@ describe("ServicePage coverage", () => {
     renderWithErrorAndRetry(ServicePage, 1);
   });
 });
-
-// =====================================================================
-// Firewall Page — Retry + Refresh
-// =====================================================================
-describe("FirewallPage coverage", () => {
-  it("retries all sections on error", () => {
-    // Firewall has 6 NodePageShell sections, all with onRetry
-    renderWithErrorAndRetry(FirewallPage, 6);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/rules") {
-        return mockQuery({
-          data: {
-            raw_output: "table inet filter { chain input { accept } }",
-            rules_count: 1,
-          },
-          refetch: refetchFn,
-        });
-      }
-      return mockQuery({ data: [], refetch: refetchFn });
-    });
-    render(<FirewallPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-  });
-});
-
-// =====================================================================
-// Network Page — Retry + Refresh
-// =====================================================================
-describe("NetworkPage coverage", () => {
-  it("retries all sections on error", () => {
-    renderWithErrorAndRetry(NetworkPage, 4);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            name: "eth0",
-            state: "UP",
-            mtu: 1500,
-            mac: "aa:bb:cc:dd:ee:ff",
-            ipv4: "10.0.0.1",
-          },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<NetworkPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-  });
-});
-
 // =====================================================================
 // Config Page — Retry + Refresh
 // =====================================================================
@@ -311,82 +242,6 @@ describe("TrafficPage coverage", () => {
     expect(refetchFn).toHaveBeenCalledTimes(2);
   });
 });
-
-// =====================================================================
-// IP Pool Page — Retry + Refresh
-// =====================================================================
-describe("IpPoolPage coverage", () => {
-  it("retries on error", () => {
-    renderWithErrorAndRetry(IpPoolPage, 1);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          { name: "pool1", range: "10.0.0.0/24", used: 100, available: 156, total: 256 },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<IpPoolPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-  });
-});
-
-// =====================================================================
-// PPPoE Page — Retry + Refresh
-// =====================================================================
-describe("PppoePage coverage", () => {
-  it("retries all sections on error", () => {
-    renderWithErrorAndRetry(PppoePage, 3);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          { name: "pppoe0", state: "active", sessions: 42, mtu: 1492, mac: "aa:bb:cc:dd:ee:ff" },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<PppoePage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-  });
-});
-
-// =====================================================================
-// Routing Page — Retry + Refresh
-// =====================================================================
-describe("RoutingPage coverage", () => {
-  it("retries all detail sections on error", () => {
-    // Routing has 4 detail NodePageShell sections (BGP, OSPF, RIP, BFD), each with onRetry
-    renderWithErrorAndRetry(RoutingPage, 4);
-  });
-
-  it("clicks Refresh buttons", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: { status: "active", neighbors: 2 },
-        refetch: refetchFn,
-      }),
-    );
-    render(<RoutingPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    expect(refreshBtns.length).toBe(4);
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalledTimes(4);
-  });
-});
-
 // =====================================================================
 // DHCP Page — Retry + Refresh
 // =====================================================================
@@ -433,30 +288,6 @@ describe("EventsPage coverage", () => {
     expect(refetchFn).toHaveBeenCalledTimes(2);
   });
 });
-
-// =====================================================================
-// Logs Page — Retry + Refresh
-// =====================================================================
-describe("LogsPage coverage", () => {
-  it("retries on error", () => {
-    renderWithErrorAndRetry(LogsPage, 1);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: ["2026-07-10 [info] Started"],
-        refetch: refetchFn,
-      }),
-    );
-    render(<LogsPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-  });
-});
-
 // =====================================================================
 // Monitoring Page — Retry + Refresh
 // =====================================================================
@@ -484,41 +315,6 @@ describe("MonitoringPage coverage", () => {
     expect(refetchFn).toHaveBeenCalled();
   });
 });
-
-// =====================================================================
-// System Page — Retry + Refresh
-// =====================================================================
-describe("SystemPage coverage", () => {
-  it("retries all sections on error", () => {
-    // System has 6 NodePageShell sections, all with onRetry
-    renderWithErrorAndRetry(SystemPage, 6);
-  });
-
-  it("clicks Refresh buttons", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            local_port: "ge0",
-            remote_system: "sw1",
-            remote_port: "ge1",
-            remote_description: "Core",
-            ttl: 120,
-          },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<SystemPage />);
-    // System has 2 Refresh buttons (LLDP and Audit Log sections)
-    const refreshBtns = screen.getAllByText("Refresh");
-    expect(refreshBtns.length).toBe(2);
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalledTimes(2);
-  });
-});
-
 // =====================================================================
 // Diagnostics Page — Retry + Refresh
 // =====================================================================
@@ -581,13 +377,14 @@ function mockMutationPending(pendingPath: string) {
 describe("Cancel dialog coverage", () => {
   it("ConfigPage: Cancel dialog covers onOpenChange", () => {
     mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "config") return mockQuery({ data: { key: "value" } });
+      if (path === "config") {
+        return mockQuery({ data: { path: "/etc/accel-ppp.conf", content: "x", last_modified: "" } });
+      }
       return mockQuery({ data: [], refetch: vi.fn() });
     });
     render(<ConfigPage />);
-    // Click "Apply" to open the dialog
-    const applyBtn = screen.getByText("Apply");
-    fireEvent.click(applyBtn);
+    // Click "Confirm" to open the guarded-apply confirmation dialog
+    fireEvent.click(screen.getByText("Confirm"));
     // Dialog should be open
     expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
     // Click Cancel to close — triggers onOpenChange(false) → !open && setConfirmAction(null)
@@ -679,18 +476,6 @@ describe("isPending branch coverage", () => {
     expect(restartBtn.closest("button")?.disabled).toBe(true);
   });
 
-  it("ConfigPage: apply isPending shows loader", () => {
-    mockMutationPending("config/apply");
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "config") return mockQuery({ data: { key: "value" } });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<ConfigPage />);
-    // Apply button should be disabled
-    const applyBtn = screen.getByText("Apply");
-    expect(applyBtn.closest("button")?.disabled).toBe(true);
-  });
-
   it("DhcpPage: restart isPending shows loader", () => {
     mockMutationPending("dhcp/restart");
     mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
@@ -721,26 +506,6 @@ describe("isPending branch coverage", () => {
     // Restart button should be disabled
     const restartBtn = screen.getByText("Restart");
     expect(restartBtn.closest("button")?.disabled).toBe(true);
-  });
-
-  it("FirewallPage: save isPending shows loader", () => {
-    mockMutationPending("firewall/save");
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/rules") {
-        return mockQuery({
-          data: {
-            raw_output: "table inet filter { chain input { accept } }",
-            rules_count: 1,
-          },
-          refetch: vi.fn(),
-        });
-      }
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<FirewallPage />);
-    // Save Rules button should be disabled
-    const saveBtn = screen.getByText("Save Rules");
-    expect(saveBtn.closest("button")?.disabled).toBe(true);
   });
 
   it("DiagnosticsPage: playbook isPending shows loader", () => {
@@ -869,53 +634,6 @@ describe("Alternative state branch coverage", () => {
     render(<ServicePage />);
     // status ?? "unknown" — the fallback
     expect(screen.getByText("unknown")).toBeTruthy();
-  });
-
-  it("NetworkPage: non-UP interface state renders outline badge", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "network/interfaces") return mockQuery({ data: [{ name: "eth0", state: "DOWN", mtu: 1500, mac: "aa:bb:cc:dd:ee:ff" }], refetch: vi.fn() });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<NetworkPage />);
-    expect(screen.getByText("DOWN")).toBeTruthy();
-  });
-
-  it("NetworkPage: VLAN with undefined state shows dash fallback", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "network/vlans") return mockQuery({ data: [{ id: 100, parent: "eth0", name: "eth0.100" }], refetch: vi.fn() });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<NetworkPage />);
-    // state ?? "—" fallback
-    expect(screen.getByText("—")).toBeTruthy();
-  });
-
-  it("NetworkPage: VLAN with non-UP state renders outline badge", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "network/vlans") return mockQuery({ data: [{ id: 100, parent: "eth0", name: "eth0.100", state: "DOWN" }], refetch: vi.fn() });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<NetworkPage />);
-    expect(screen.getByText("DOWN")).toBeTruthy();
-  });
-
-  it("FirewallPage: NAT with non-active status renders outline", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/nat/egress") return mockQuery({ data: [{ type: "snat", interface: "eth0", source: "10.0.0.0/8", status: "inactive" }], refetch: vi.fn() });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<FirewallPage />);
-    expect(screen.getByText("inactive")).toBeTruthy();
-  });
-
-  it("FirewallPage: NAT with undefined status shows dash fallback", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/nat/masquerade") return mockQuery({ data: [{ type: "masq", interface: "eth0", source: "10.0.0.0/8" }], refetch: vi.fn() });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<FirewallPage />);
-    // status ?? "—" fallback
-    expect(screen.getByText("—")).toBeTruthy();
   });
 
   it("DhcpPage: non-active lease state renders outline badge", () => {

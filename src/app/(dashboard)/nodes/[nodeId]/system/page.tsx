@@ -8,52 +8,184 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw } from "lucide-react";
-import { formatValue } from "@/lib/utils";
+import { formatUptime } from "@/lib/utils";
 
+/** Live resource metrics from `system/metrics` (nested objects, polled). */
+interface Metrics {
+  cpu?: { count?: number; percent?: number; load_avg?: number[] };
+  memory?: { total_mb?: number; used_mb?: number; available_mb?: number; percent?: number };
+  disk?: { total_gb?: number; used_gb?: number; free_gb?: number; percent?: number };
+  timestamp?: number | string;
+}
+
+/** Interface entry embedded in `system/info`. */
+interface SysInterface {
+  name: string;
+  addresses?: unknown[];
+  is_up?: boolean;
+}
+
+/** Host identity from `system/info`. */
+interface SysInfo {
+  hostname?: string;
+  os?: string;
+  kernel?: string;
+  arch?: string;
+  boot_time?: number | string;
+  interfaces?: SysInterface[];
+}
+
+/** Time-sync status from `ntp/status`. */
+interface NtpStatus {
+  synced?: boolean;
+  reference?: string;
+  stratum?: number;
+  system_time_offset?: string | number;
+  last_offset?: string | number;
+  frequency?: string | number;
+  raw_output?: string;
+}
+
+/** LLDP neighbour from `lldp/neighbors`. */
 interface LldpNeighbor {
-  local_port: string;
-  remote_system: string;
-  remote_port: string;
+  local_port?: string;
+  remote_system?: string;
+  remote_port?: string;
   remote_description?: string;
   ttl?: number;
 }
 
-interface NtpPeer {
-  remote: string;
-  refid?: string;
-  stratum?: number;
-  reach?: number;
-  delay?: string;
-  offset?: string;
-  jitter?: string;
-  tally?: string;
+/** Progress-bar colour by utilisation: green ≤ 70 < amber ≤ 90 < red. */
+function usageColor(pct: number): string {
+  if (pct > 90) return "bg-red-500";
+  if (pct > 70) return "bg-amber-500";
+  return "bg-emerald-500";
 }
 
-interface AuditEntry {
-  timestamp: string;
-  user: string;
-  action: string;
-  detail?: string;
-  source_ip?: string;
+/** Format megabytes as GB when ≥ 1 GB, else MB; em dash when unknown. */
+function formatMb(mb: number | undefined): string {
+  if (mb === undefined) return "—";
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${Math.round(mb)} MB`;
+}
+
+/** Format gigabytes to one decimal; em dash when unknown. */
+function formatGb(gb: number | undefined): string {
+  if (gb === undefined) return "—";
+  return `${gb.toFixed(1)} GB`;
+}
+
+/** Compute a human uptime from a boot timestamp (unix seconds/ms or a date string). */
+function computeUptime(bootTime: number | string | undefined): string {
+  if (!bootTime) return "—";
+  let bootMs: number;
+  if (typeof bootTime === "number") {
+    bootMs = bootTime > 1e12 ? bootTime : bootTime * 1000;
+  } else {
+    const parsed = new Date(bootTime).getTime();
+    if (Number.isNaN(parsed)) return "—";
+    bootMs = parsed;
+  }
+  const seconds = Math.max(0, Math.floor((Date.now() - bootMs) / 1000));
+  return formatUptime(seconds);
+}
+
+/** Render one interface address (string or `{ address, prefix_len }`) as text. */
+function addressText(addr: unknown): string {
+  if (typeof addr === "string") return addr;
+  if (addr && typeof addr === "object" && "address" in addr) {
+    const a = addr as { address?: string; prefix_len?: number };
+    return a.prefix_len != null ? `${a.address}/${a.prefix_len}` : String(a.address);
+  }
+  return String(addr);
+}
+
+interface GaugeProps {
+  label: string;
+  percent: number;
+  primary: string;
+  secondary: string;
+}
+
+/** A labelled utilisation gauge card (CPU / Memory / Disk). */
+function MetricGauge({ label, percent, primary, secondary }: GaugeProps) {
+  const width = Math.min(100, Math.max(0, percent));
+  return (
+    <Card className="rounded-xl border-border">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-heading text-sm text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <span className="text-2xl font-bold tabular-nums">{percent}%</span>
+          <span className="text-xs text-muted-foreground">{primary}</span>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full ${usageColor(percent)}`}
+            style={{ width: `${width}%` }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">{secondary}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
 /**
  * System information page.
- * Displays system info, metrics, LLDP neighbors, NTP peers, and audit log.
- * Covers dawos-agent endpoints: system/info, system/metrics, lldp/neighbors,
- * ntp/status, ntp/peers, audit/log.
+ * Resource gauges (system/metrics, polled every 15s), host identity + computed
+ * uptime and interfaces (system/info), NTP sync status (ntp/status), and LLDP
+ * neighbours (lldp/neighbors). audit/log and ntp/peers are omitted (404).
  */
 export default function SystemPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
 
-  const sysInfo = useNodeProxy<Record<string, unknown>>(nodeId, "system/info");
-  const sysMetrics = useNodeProxy<Record<string, unknown>>(nodeId, "system/metrics", {
-    refetchInterval: 15_000,
-  });
+  const info = useNodeProxy<SysInfo>(nodeId, "system/info");
+  const metrics = useNodeProxy<Metrics>(nodeId, "system/metrics", { refetchInterval: 15_000 });
+  const ntp = useNodeProxy<NtpStatus>(nodeId, "ntp/status");
   const lldp = useNodeProxy<LldpNeighbor[]>(nodeId, "lldp/neighbors", { extract: "neighbors" });
-  const ntpStatus = useNodeProxy<Record<string, unknown>>(nodeId, "ntp/status");
-  const ntpPeers = useNodeProxy<NtpPeer[]>(nodeId, "ntp/peers", { extract: "peers" });
-  const audit = useNodeProxy<AuditEntry[]>(nodeId, "audit/log", { extract: "entries" });
+
+  const cpu = metrics.data?.cpu;
+  const mem = metrics.data?.memory;
+  const disk = metrics.data?.disk;
+  const loadAvg = cpu?.load_avg ?? [];
+
+  const identity = [
+    { label: "Hostname", value: info.data?.hostname },
+    { label: "OS", value: info.data?.os },
+    { label: "Kernel", value: info.data?.kernel },
+    { label: "Architecture", value: info.data?.arch },
+    { label: "Uptime", value: computeUptime(info.data?.boot_time) },
+  ];
+
+  const ntpFields = [
+    { label: "Reference", value: ntp.data?.reference },
+    { label: "Stratum", value: ntp.data?.stratum },
+    { label: "System Time Offset", value: ntp.data?.system_time_offset },
+    { label: "Last Offset", value: ntp.data?.last_offset },
+    { label: "Frequency", value: ntp.data?.frequency },
+  ];
+
+  const ifColumns: ProxyColumn<SysInterface>[] = [
+    { header: "Name", accessorKey: "name", className: "font-medium" },
+    {
+      header: "Addresses",
+      className: "font-mono text-xs",
+      cell: (row) =>
+        row.addresses && row.addresses.length > 0 ? (
+          <span>{row.addresses.map(addressText).join(", ")}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      header: "State",
+      cell: (row) => (
+        <Badge variant={row.is_up ? "default" : "outline"}>{row.is_up ? "UP" : "DOWN"}</Badge>
+      ),
+    },
+  ];
 
   const lldpColumns: ProxyColumn<LldpNeighbor>[] = [
     { header: "Local Port", accessorKey: "local_port", className: "font-mono text-xs" },
@@ -63,150 +195,122 @@ export default function SystemPage() {
     { header: "TTL", accessorKey: "ttl" },
   ];
 
-  const ntpColumns: ProxyColumn<NtpPeer>[] = [
-    {
-      header: "Tally",
-      cell: (row) => (
-        <Badge variant={row.tally === "*" ? "default" : "outline"}>{row.tally ?? "-"}</Badge>
-      ),
-    },
-    { header: "Remote", accessorKey: "remote", className: "font-mono text-xs" },
-    { header: "Ref ID", accessorKey: "refid", className: "font-mono text-xs" },
-    { header: "Stratum", accessorKey: "stratum" },
-    { header: "Delay", accessorKey: "delay" },
-    { header: "Offset", accessorKey: "offset" },
-    { header: "Jitter", accessorKey: "jitter" },
-  ];
-
-  const auditColumns: ProxyColumn<AuditEntry>[] = [
-    { header: "Time", accessorKey: "timestamp" },
-    { header: "User", accessorKey: "user", className: "font-medium" },
-    { header: "Action", accessorKey: "action" },
-    { header: "Detail", accessorKey: "detail" },
-    { header: "Source IP", accessorKey: "source_ip", className: "font-mono text-xs" },
-  ];
-
   return (
     <div className="space-y-6">
-      {/* System Info + Metrics */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <NodePageShell
-          title="System Information"
-          isLoading={sysInfo.isLoading}
-          error={sysInfo.error}
-          onRetry={() => sysInfo.refetch()}
-        >
-          <dl className="grid gap-2 text-sm">
-            {sysInfo.data &&
-              Object.entries(sysInfo.data).map(([key, val]) => (
-                <div key={key} className="flex justify-between border-b py-1.5 last:border-0">
-                  <dt className="text-muted-foreground">{key.replace(/_/g, " ")}</dt>
-                  <dd className="font-mono text-xs">{formatValue(val)}</dd>
-                </div>
-              ))}
-          </dl>
-        </NodePageShell>
-
-        <NodePageShell
-          title="System Metrics"
-          isLoading={sysMetrics.isLoading}
-          error={sysMetrics.error}
-          onRetry={() => sysMetrics.refetch()}
-        >
-          <div className="grid gap-3 sm:grid-cols-2">
-            {sysMetrics.data &&
-              Object.entries(sysMetrics.data).map(([key, val]) => (
-                <Card key={key}>
-                  <CardHeader className="pb-1">
-                    <CardTitle className="text-xs text-muted-foreground capitalize">
-                      {key.replace(/_/g, " ")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-lg font-bold tabular-nums">
-                      {formatValue(val)}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </NodePageShell>
-      </div>
-
-      {/* NTP Status */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <NodePageShell
-          title="NTP Status"
-          isLoading={ntpStatus.isLoading}
-          error={ntpStatus.error}
-          onRetry={() => ntpStatus.refetch()}
-        >
-          <dl className="grid gap-2 text-sm">
-            {ntpStatus.data &&
-              Object.entries(ntpStatus.data).map(([key, val]) => (
-                <div key={key} className="flex justify-between border-b py-1.5 last:border-0">
-                  <dt className="text-muted-foreground">{key.replace(/_/g, " ")}</dt>
-                  <dd className="font-mono text-xs">{formatValue(val)}</dd>
-                </div>
-              ))}
-          </dl>
-        </NodePageShell>
-
-        <div className="lg:col-span-2">
-          <NodePageShell
-            title={`NTP Peers (${ntpPeers.data?.length ?? 0})`}
-            isLoading={ntpPeers.isLoading}
-            error={ntpPeers.error}
-            onRetry={() => ntpPeers.refetch()}
-            isEmpty={ntpPeers.data?.length === 0}
-            emptyMessage="No NTP peers configured."
-          >
-            <ProxyDataTable
-              columns={ntpColumns}
-              data={ntpPeers.data ?? []}
-              getRowKey={(r) => r.remote}
-            />
-          </NodePageShell>
-        </div>
-      </div>
-
-      {/* LLDP Neighbors */}
+      {/* Resource usage gauges */}
       <NodePageShell
-        title={`LLDP Neighbors (${lldp.data?.length ?? 0})`}
-        isLoading={lldp.isLoading}
-        error={lldp.error}
-        onRetry={() => lldp.refetch()}
-        isEmpty={lldp.data?.length === 0}
-        emptyMessage="No LLDP neighbors discovered."
+        title="Resource Usage"
+        isLoading={metrics.isLoading}
+        error={metrics.error}
+        onRetry={() => metrics.refetch()}
         actions={
-          <Button variant="outline" size="sm" onClick={() => lldp.refetch()}>
+          <Button variant="outline" size="sm" onClick={() => metrics.refetch()}>
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
           </Button>
         }
       >
+        <div className="grid gap-4 sm:grid-cols-3">
+          <MetricGauge
+            label="CPU"
+            percent={cpu?.percent ?? 0}
+            primary={`${cpu?.count ?? 0} cores`}
+            secondary={loadAvg.length > 0 ? `load ${loadAvg.join(" / ")}` : "load —"}
+          />
+          <MetricGauge
+            label="Memory"
+            percent={mem?.percent ?? 0}
+            primary={`${formatMb(mem?.used_mb)} / ${formatMb(mem?.total_mb)}`}
+            secondary={`${formatMb(mem?.available_mb)} available`}
+          />
+          <MetricGauge
+            label="Disk"
+            percent={disk?.percent ?? 0}
+            primary={`${formatGb(disk?.used_gb)} / ${formatGb(disk?.total_gb)}`}
+            secondary={`${formatGb(disk?.free_gb)} free`}
+          />
+        </div>
+      </NodePageShell>
+
+      {/* Host identity */}
+      <NodePageShell
+        title="Host Information"
+        isLoading={info.isLoading}
+        error={info.error}
+        onRetry={() => info.refetch()}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {identity.map((item) => (
+            <div key={item.label} className="rounded-lg border border-border bg-card p-3">
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              <p className="mt-1 font-mono text-sm break-all">{item.value || "—"}</p>
+            </div>
+          ))}
+        </div>
+      </NodePageShell>
+
+      {/* Interfaces reported by system/info */}
+      <NodePageShell
+        title={`Interfaces (${info.data?.interfaces?.length ?? 0})`}
+        isLoading={info.isLoading}
+        error={info.error}
+        onRetry={() => info.refetch()}
+        isEmpty={info.data?.interfaces?.length === 0}
+        emptyMessage="No interfaces reported."
+      >
         <ProxyDataTable
-          columns={lldpColumns}
-          data={lldp.data ?? []}
-          getRowKey={(r) => `${r.local_port}-${r.remote_system}`}
+          columns={ifColumns}
+          data={info.data?.interfaces ?? []}
+          getRowKey={(r) => r.name}
         />
       </NodePageShell>
 
-      {/* Audit Log */}
-      <NodePageShell
-        title={`Audit Log (${audit.data?.length ?? 0})`}
-        isLoading={audit.isLoading}
-        error={audit.error}
-        onRetry={() => audit.refetch()}
-        isEmpty={audit.data?.length === 0}
-        emptyMessage="No audit entries."
-        actions={
-          <Button variant="outline" size="sm" onClick={() => audit.refetch()}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
-          </Button>
-        }
-      >
-        <ProxyDataTable columns={auditColumns} data={audit.data ?? []} />
-      </NodePageShell>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* NTP status */}
+        <NodePageShell
+          title="NTP Status"
+          isLoading={ntp.isLoading}
+          error={ntp.error}
+          onRetry={() => ntp.refetch()}
+          actions={
+            <Badge variant={ntp.data?.synced ? "default" : "outline"}>
+              {ntp.data?.synced ? "Synced" : "Not synced"}
+            </Badge>
+          }
+        >
+          <dl className="grid gap-2 text-sm">
+            {ntpFields.map((f) => (
+              <div
+                key={f.label}
+                className="flex justify-between gap-4 border-b py-1.5 last:border-0"
+              >
+                <dt className="text-muted-foreground">{f.label}</dt>
+                <dd className="font-mono text-xs">{f.value ?? "—"}</dd>
+              </div>
+            ))}
+          </dl>
+        </NodePageShell>
+
+        {/* LLDP neighbours */}
+        <NodePageShell
+          title={`LLDP Neighbors (${lldp.data?.length ?? 0})`}
+          isLoading={lldp.isLoading}
+          error={lldp.error}
+          onRetry={() => lldp.refetch()}
+          isEmpty={lldp.data?.length === 0}
+          emptyMessage="No LLDP neighbors discovered."
+          actions={
+            <Button variant="outline" size="sm" onClick={() => lldp.refetch()}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+            </Button>
+          }
+        >
+          <ProxyDataTable
+            columns={lldpColumns}
+            data={lldp.data ?? []}
+            getRowKey={(r) => `${r.local_port}-${r.remote_system}`}
+          />
+        </NodePageShell>
+      </div>
     </div>
   );
 }

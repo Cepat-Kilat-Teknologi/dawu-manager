@@ -8,7 +8,15 @@ import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-t
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { toast } from "sonner";
-import { RefreshCw, Save, Undo2, CheckCircle, Loader2 } from "lucide-react";
+import {
+  RefreshCw,
+  Save,
+  Undo2,
+  CheckCircle,
+  Loader2,
+  Pencil,
+  X,
+} from "lucide-react";
 
 interface ConfigBackup {
   name: string;
@@ -17,25 +25,37 @@ interface ConfigBackup {
   path?: string;
 }
 
+interface ConfigData {
+  path: string;
+  content: string;
+  last_modified: string;
+}
+
 /**
  * Configuration management page.
- * View, apply, rollback, and manage accel-ppp configuration and backups.
+ * View and inline-edit accel-ppp configuration, apply/confirm/rollback the
+ * guarded-apply workflow, and browse backups and revisions.
  * Covers dawos-agent endpoints: config, config/apply, config/confirm,
- * config/rollback, config/backups, config/revisions, config/diff.
+ * config/rollback, config/backups, config/revisions.
  */
 export default function ConfigPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
 
-  const config = useNodeProxy<{ path: string; content: string; last_modified: string }>(nodeId, "config");
+  const config = useNodeProxy<ConfigData>(nodeId, "config");
   const backups = useNodeProxy<ConfigBackup[]>(nodeId, "config/backups");
   const revisions = useNodeProxy<Record<string, unknown>[]>(nodeId, "config/revisions", { extract: "revisions" });
 
   const applyMutation = useNodeProxyMutation(nodeId, "config/apply", {
     invalidates: ["config"],
     onSuccess: () => {
-      toast.success("Configuration applied");
+      toast.success("Configuration applied", {
+        description: "Confirm within the guard window to keep it, or it rolls back.",
+      });
       setConfirmAction(null);
+      setEditing(false);
     },
   });
 
@@ -52,8 +72,15 @@ export default function ConfigPage() {
     onSuccess: () => {
       toast.success("Configuration rolled back");
       setConfirmAction(null);
+      setEditing(false);
     },
   });
+
+  /** Enter edit mode, seeding the draft from the currently loaded config. */
+  function startEditing() {
+    setDraft(config.data?.content ?? "");
+    setEditing(true);
+  }
 
   const backupColumns: ProxyColumn<ConfigBackup>[] = [
     { header: "Name", accessorKey: "name", className: "font-medium" },
@@ -63,30 +90,86 @@ export default function ConfigPage() {
 
   return (
     <div className="space-y-6">
-      {/* Current config */}
+      {/* Current config — view + inline edit */}
       <NodePageShell
         title="Current Configuration"
         isLoading={config.isLoading}
         error={config.error}
         onRetry={() => config.refetch()}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setConfirmAction("apply")} disabled={applyMutation.isPending}>
-              {applyMutation.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
-              Apply
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setConfirmAction("confirm")} disabled={confirmMutation.isPending}>
-              <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Confirm
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setConfirmAction("rollback")} disabled={rollbackMutation.isPending}>
-              <Undo2 className="mr-1.5 h-3.5 w-3.5" /> Rollback
-            </Button>
-          </div>
+          editing ? (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => applyMutation.mutate({ content: draft })}
+                disabled={applyMutation.isPending}
+              >
+                {applyMutation.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {applyMutation.isPending ? "Saving…" : "Save & Apply"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(false)}
+                disabled={applyMutation.isPending}
+              >
+                <X className="mr-1.5 h-3.5 w-3.5" /> Cancel
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={startEditing}
+                disabled={!config.data}
+              >
+                <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmAction("confirm")}
+                disabled={confirmMutation.isPending}
+              >
+                <CheckCircle className="mr-1.5 h-3.5 w-3.5" /> Confirm
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmAction("rollback")}
+                disabled={rollbackMutation.isPending}
+              >
+                <Undo2 className="mr-1.5 h-3.5 w-3.5" /> Rollback
+              </Button>
+            </div>
+          )
         }
       >
-        <pre className="rounded-md bg-muted p-4 text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap">
-          {config.data?.content ?? "No data"}
-        </pre>
+        {editing ? (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Editing{" "}
+              <span className="font-mono">{config.data?.path ?? "config"}</span>.
+              Saving applies with a guard timer — press Confirm afterwards to keep
+              the change, otherwise it auto-rolls back.
+            </p>
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              spellCheck={false}
+              aria-label="Configuration content"
+              className="h-96 w-full resize-y rounded-md border bg-muted/40 p-4 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        ) : (
+          <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 font-mono text-xs whitespace-pre-wrap">
+            {config.data?.content ?? "No data"}
+          </pre>
+        )}
       </NodePageShell>
 
       {/* Backups */}
@@ -128,19 +211,16 @@ export default function ConfigPage() {
       <ConfirmDialog
         open={confirmAction !== null}
         onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={`${confirmAction?.charAt(0).toUpperCase()}${confirmAction?.slice(1) ?? ""} Configuration`}
+        title={confirmAction === "rollback" ? "Rollback Configuration" : "Confirm Configuration"}
         description={
           confirmAction === "rollback"
-            ? "This will revert to the previous configuration and disconnect active sessions. Are you sure?"
-            : confirmAction === "apply"
-              ? "Apply the pending configuration changes? Active sessions may be affected."
-              : "Confirm the currently applied configuration?"
+            ? "This will revert to the previous configuration and may disconnect active sessions. Are you sure?"
+            : "Confirm the currently applied configuration so it persists past the guard window?"
         }
         confirmLabel={confirmAction ?? "Confirm"}
         variant={confirmAction === "rollback" ? "destructive" : "default"}
         onConfirm={async () => {
-          if (confirmAction === "apply") await applyMutation.mutateAsync({});
-          else if (confirmAction === "confirm") await confirmMutation.mutateAsync({});
+          if (confirmAction === "confirm") await confirmMutation.mutateAsync({});
           else await rollbackMutation.mutateAsync({});
         }}
       />

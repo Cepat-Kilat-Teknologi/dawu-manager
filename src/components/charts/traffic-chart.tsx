@@ -34,6 +34,20 @@ export interface AggregateTrafficEvent {
 /** Rolling buffer size — 10 minutes at the agent's 2s default interval. */
 const MAX_POINTS = 300;
 
+/**
+ * Chart update cadence options. The SSE stream always arrives at the agent's
+ * ~2s rate; these downsample how often a new point is appended to the chart.
+ * `0` = realtime (append every event).
+ */
+export const REFRESH_INTERVALS: { label: string; ms: number }[] = [
+  { label: "Realtime", ms: 0 },
+  { label: "5s", ms: 5_000 },
+  { label: "10s", ms: 10_000 },
+  { label: "30s", ms: 30_000 },
+  { label: "1m", ms: 60_000 },
+  { label: "5m", ms: 300_000 },
+];
+
 /** Format a Mbps value for tooltips/labels: "125.4 Mbps". */
 export function formatMbps(value: number): string {
   return `${value.toFixed(1)} Mbps`;
@@ -91,7 +105,12 @@ function LiveTrafficChart({
   const [streamEnded, setStreamEnded] = useState<string | null>(null);
   const [sessionCount, setSessionCount] = useState<number | null>(null);
   const [topSessions, setTopSessions] = useState<SessionTraffic[]>([]);
+  const [intervalMs, setIntervalMs] = useState(0);
+  // Server timestamp of the last point appended to the chart (for downsampling).
+  const lastAppendRef = useRef(0);
 
+  // useNodeSSE keeps the latest onMessage (re-created each render), so the
+  // callback below closes over the current `intervalMs` without re-subscribing.
   const { status, close } = useNodeSSE<AggregateTrafficEvent>(
     nodeId,
     "traffic/stream",
@@ -110,6 +129,15 @@ function LiveTrafficChart({
         // aggregate_traffic_events); skip malformed payloads.
         if (!event.timestamp) return;
         const t = new Date(event.timestamp).getTime();
+
+        // Session count/list stay live regardless of chart cadence.
+        setSessionCount(event.session_count ?? event.sessions?.length ?? 0);
+        setTopSessions((event.sessions ?? []).slice(0, 5));
+
+        // Downsample chart appends to the selected refresh interval.
+        if (intervalMs !== 0 && t - lastAppendRef.current < intervalMs) return;
+        lastAppendRef.current = t;
+
         const buf = bufferRef.current;
         buf.rx.push([t, event.total_download_mbps ?? 0]);
         buf.tx.push([t, event.total_upload_mbps ?? 0]);
@@ -118,8 +146,6 @@ function LiveTrafficChart({
         chartRef.current?.getEchartsInstance().setOption({
           series: [{ data: buf.rx }, { data: buf.tx }],
         });
-        setSessionCount(event.session_count ?? event.sessions?.length ?? 0);
-        setTopSessions((event.sessions ?? []).slice(0, 5));
       },
     },
   );
@@ -268,9 +294,9 @@ function LiveTrafficChart({
 
   return (
     <div className={cn("content-fade-in", className)}>
-      <div className="relative">
-        {/* Live status + session count */}
-        <div className="absolute left-0 top-0 z-10 flex items-center gap-3 text-xs text-muted-foreground">
+      {/* Header: live status + session count (left) · refresh cadence (right) */}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span
               className={cn(
@@ -291,15 +317,30 @@ function LiveTrafficChart({
             </span>
           )}
         </div>
-        <ReactECharts
-          ref={chartRef}
-          option={option}
-          style={{ height, width: "100%" }}
-          opts={{ renderer: "canvas" }}
-          notMerge={false}
-          lazyUpdate
-        />
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="hidden sm:inline">Refresh</span>
+          <select
+            value={intervalMs}
+            onChange={(e) => setIntervalMs(Number(e.target.value))}
+            aria-label="Chart refresh interval"
+            className="rounded-md border bg-card px-2 py-1 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {REFRESH_INTERVALS.map((o) => (
+              <option key={o.ms} value={o.ms}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      <ReactECharts
+        ref={chartRef}
+        option={option}
+        style={{ height, width: "100%" }}
+        opts={{ renderer: "canvas" }}
+        notMerge={false}
+        lazyUpdate
+      />
 
       {/* Live top talkers */}
       {topSessions.length > 0 && (

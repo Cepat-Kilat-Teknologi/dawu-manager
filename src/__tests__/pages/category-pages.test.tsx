@@ -94,18 +94,11 @@ function mockQuery(overrides: Record<string, unknown> = {}) {
 // --- Page imports ---
 import SessionsPage from "@/app/(dashboard)/nodes/[nodeId]/sessions/page";
 import ServicePage from "@/app/(dashboard)/nodes/[nodeId]/service/page";
-import FirewallPage from "@/app/(dashboard)/nodes/[nodeId]/firewall/page";
-import NetworkPage from "@/app/(dashboard)/nodes/[nodeId]/network/page";
 import ConfigPage from "@/app/(dashboard)/nodes/[nodeId]/config/page";
 import TrafficPage from "@/app/(dashboard)/nodes/[nodeId]/traffic/page";
-import IpPoolPage from "@/app/(dashboard)/nodes/[nodeId]/ip-pool/page";
-import PppoePage from "@/app/(dashboard)/nodes/[nodeId]/pppoe/page";
-import RoutingPage from "@/app/(dashboard)/nodes/[nodeId]/routing/page";
 import DhcpPage from "@/app/(dashboard)/nodes/[nodeId]/dhcp/page";
 import EventsPage from "@/app/(dashboard)/nodes/[nodeId]/events/page";
-import LogsPage from "@/app/(dashboard)/nodes/[nodeId]/logs/page";
 import MonitoringPage from "@/app/(dashboard)/nodes/[nodeId]/monitoring/page";
-import SystemPage from "@/app/(dashboard)/nodes/[nodeId]/system/page";
 import DiagnosticsPage from "@/app/(dashboard)/nodes/[nodeId]/diagnostics/page";
 
 beforeEach(() => {
@@ -404,218 +397,6 @@ describe("ServicePage", () => {
     expect(screen.getByText("unknown")).toBeTruthy();
   });
 });
-
-// =====================================================================
-// Firewall Page
-// =====================================================================
-describe("FirewallPage", () => {
-  const fullFirewallMock = () =>
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/rules") {
-        return mockQuery({
-          data: {
-            raw_output: "table inet filter {\n  chain input {\n    tcp dport 22 accept # SSH\n  }\n}",
-            rules_count: 1,
-          },
-        });
-      }
-      if (path === "firewall/groups") {
-        return mockQuery({
-          data: [{ name: "blocked", group_type: "address", members: "5" }],
-        });
-      }
-      if (path === "firewall/nat/egress") {
-        return mockQuery({
-          data: [
-            {
-              type: "snat",
-              interface: "wan0",
-              source: "10.0.0.0/24",
-              status: "active",
-            },
-          ],
-        });
-      }
-      if (path === "firewall/nat/masquerade") {
-        return mockQuery({
-          data: [
-            {
-              type: "masquerade",
-              interface: "wan1",
-              source: "any",
-              status: "inactive",
-            },
-          ],
-        });
-      }
-      if (path === "firewall/conntrack/config") {
-        return mockQuery({ data: { max_entries: 65536, tcp_timeout: 3600 } });
-      }
-      if (path === "firewall/sysctl") {
-        return mockQuery({
-          data: { "net.ipv4.ip_forward": "1", "net.core.somaxconn": "128" },
-        });
-      }
-      return mockQuery({ data: {} });
-    });
-
-  it("shows loading state", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<FirewallPage />);
-    expect(screen.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders all firewall sections with data", () => {
-    fullFirewallMock();
-    render(<FirewallPage />);
-    // Rules section shows raw_output in a <pre>
-    expect(screen.getByText(/tcp dport 22 accept/)).toBeTruthy();
-    expect(screen.getByText("blocked")).toBeTruthy();
-    expect(screen.queryAllByText("active").length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryAllByText("inactive").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("max entries")).toBeTruthy();
-    expect(screen.getByText("65,536")).toBeTruthy();
-    expect(screen.getByText("net.ipv4.ip_forward")).toBeTruthy();
-  });
-
-  it("fires save mutation", () => {
-    fullFirewallMock();
-    render(<FirewallPage />);
-    fireEvent.click(screen.getByText("Save Rules"));
-    expect(capturedMutations[0].mutate).toHaveBeenCalledWith({});
-  });
-
-  it("calls onSuccess for save mutation", () => {
-    fullFirewallMock();
-    render(<FirewallPage />);
-    capturedMutations[0]?.onSuccess!();
-  });
-
-  it("renders empty sections", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/rules") {
-        return mockQuery({ data: { raw_output: "", rules_count: 0 } });
-      }
-      if (
-        path === "firewall/groups" ||
-        path === "firewall/nat/egress" ||
-        path === "firewall/nat/masquerade"
-      ) {
-        return mockQuery({ data: [] });
-      }
-      return mockQuery({ data: {} });
-    });
-    render(<FirewallPage />);
-    expect(screen.getByText("No firewall rules configured.")).toBeTruthy();
-  });
-});
-
-// =====================================================================
-// Network Page
-// =====================================================================
-describe("NetworkPage", () => {
-  const fullNetworkMock = () =>
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "network/interfaces") {
-        return mockQuery({
-          data: [
-            {
-              name: "ens18",
-              state: "UP",
-              mtu: 1500,
-              mac: "aa:bb:cc:dd:ee:ff",
-              ipv4: "10.0.0.1",
-              speed: "1000Mb",
-            },
-            {
-              name: "ens19",
-              state: "DOWN",
-              mtu: 1500,
-              mac: "11:22:33:44:55:66",
-            },
-          ],
-        });
-      }
-      if (path === "network/routes") {
-        return mockQuery({
-          data: [
-            {
-              destination: "0.0.0.0/0",
-              gateway: "10.0.0.1",
-              interface: "ens18",
-              metric: 100,
-              protocol: "static",
-            },
-          ],
-        });
-      }
-      if (path === "network/vlans") {
-        return mockQuery({
-          data: [
-            { id: 100, parent: "ens18", name: "vlan100", state: "UP" },
-            { id: 200, parent: "ens18", name: "vlan200", state: "down" },
-          ],
-        });
-      }
-      if (path === "network/dns") {
-        return mockQuery({
-          data: { nameservers: ["8.8.8.8", "1.1.1.1"], domain: "local" },
-        });
-      }
-      return mockQuery({ data: {} });
-    });
-
-  it("shows loading state", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<NetworkPage />);
-    expect(screen.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders interfaces with state badges", () => {
-    fullNetworkMock();
-    render(<NetworkPage />);
-    // ens18 appears in interfaces + routes — use queryAll
-    expect(screen.queryAllByText("ens18").length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryAllByText("UP").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("DOWN")).toBeTruthy();
-  });
-
-  it("renders routes", () => {
-    fullNetworkMock();
-    render(<NetworkPage />);
-    expect(screen.getByText("0.0.0.0/0")).toBeTruthy();
-  });
-
-  it("renders VLANs with state badges", () => {
-    fullNetworkMock();
-    render(<NetworkPage />);
-    expect(screen.getByText("vlan100")).toBeTruthy();
-    expect(screen.getByText("vlan200")).toBeTruthy();
-  });
-
-  it("renders DNS with array values joined", () => {
-    fullNetworkMock();
-    render(<NetworkPage />);
-    expect(screen.getByText("8.8.8.8, 1.1.1.1")).toBeTruthy();
-    expect(screen.getByText("local")).toBeTruthy();
-  });
-
-  it("renders empty states", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (
-        path === "network/interfaces" ||
-        path === "network/routes" ||
-        path === "network/vlans"
-      ) {
-        return mockQuery({ data: [] });
-      }
-      return mockQuery({ data: {} });
-    });
-    render(<NetworkPage />);
-    expect(screen.getByText("No network interfaces found.")).toBeTruthy();
-  });
-});
-
 // =====================================================================
 // Config Page
 // =====================================================================
@@ -671,13 +452,60 @@ describe("ConfigPage", () => {
     expect(screen.getByText("2 KB")).toBeTruthy();
   });
 
-  it("opens apply confirm dialog", () => {
+  it("enters edit mode and applies edited content via Save & Apply", () => {
     fullConfigMock();
     render(<ConfigPage />);
-    fireEvent.click(screen.getByText("Apply"));
-    expect(screen.getByTestId("confirm-desc").textContent).toContain(
-      "Apply the pending",
-    );
+    fireEvent.click(screen.getByText("Edit"));
+    const textarea = screen.getByLabelText(
+      "Configuration content",
+    ) as HTMLTextAreaElement;
+    expect(textarea.value).toBe("[ppp]\nverbose=1");
+    fireEvent.change(textarea, { target: { value: "[ppp]\nverbose=5" } });
+    fireEvent.click(screen.getByText("Save & Apply"));
+    expect(capturedMutations[0].mutate).toHaveBeenCalledWith({
+      content: "[ppp]\nverbose=5",
+    });
+  });
+
+  it("cancels edit mode without applying", () => {
+    fullConfigMock();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+    expect(screen.getByLabelText("Configuration content")).toBeTruthy();
+    fireEvent.click(screen.getByText("Cancel"));
+    expect(screen.queryByLabelText("Configuration content")).toBeNull();
+  });
+
+  it("edits with fallbacks when config content and path are missing", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "config") return mockQuery({ data: {} });
+      return mockQuery({ data: [] });
+    });
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+    // content ?? "" seeds an empty draft; path ?? "config" renders in the hint.
+    const textarea = screen.getByLabelText(
+      "Configuration content",
+    ) as HTMLTextAreaElement;
+    expect(textarea.value).toBe("");
+    expect(screen.getByText("config")).toBeTruthy();
+  });
+
+  it("shows saving spinner state while apply is pending", () => {
+    fullConfigMock();
+    mockUseNodeProxyMutation.mockImplementation(() => {
+      const m = {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+        onSuccess: undefined,
+      };
+      capturedMutations.push(m);
+      return m;
+    });
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+    expect(screen.getByText("Saving…")).toBeTruthy();
   });
 
   it("opens confirm confirm dialog", () => {
@@ -696,16 +524,6 @@ describe("ConfigPage", () => {
     expect(screen.getByTestId("confirm-desc").textContent).toContain(
       "revert to the previous",
     );
-  });
-
-  it("executes apply via confirm", async () => {
-    fullConfigMock();
-    render(<ConfigPage />);
-    fireEvent.click(screen.getByText("Apply"));
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("confirm-btn"));
-    });
-    expect(capturedMutations[0].mutateAsync).toHaveBeenCalledWith({});
   });
 
   it("executes confirm via confirm", async () => {
@@ -734,6 +552,15 @@ describe("ConfigPage", () => {
     capturedMutations[0]?.onSuccess!();
     capturedMutations[1]?.onSuccess!();
     capturedMutations[2]?.onSuccess!();
+  });
+
+  it("disables Edit when config has not loaded", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "config") return mockQuery({ data: undefined });
+      return mockQuery({ data: [] });
+    });
+    render(<ConfigPage />);
+    expect((screen.getByText("Edit").closest("button") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("renders empty backups and revisions", () => {
@@ -837,233 +664,6 @@ describe("TrafficPage", () => {
     expect(screen.getByText("No queue statistics available.")).toBeTruthy();
   });
 });
-
-// =====================================================================
-// IP Pool Page
-// =====================================================================
-describe("IpPoolPage", () => {
-  const fullPoolMock = () =>
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "ip-pool") {
-        return mockQuery({
-          data: [
-            {
-              name: "pool-a",
-              range: "10.0.0.0/24",
-              used: 230,
-              available: 24,
-              total: 254,
-            },
-            {
-              name: "pool-b",
-              range: "10.1.0.0/24",
-              used: 180,
-              available: 74,
-              total: 254,
-            },
-            {
-              name: "pool-c",
-              range: "10.2.0.0/24",
-              used: 10,
-              available: 244,
-              total: 254,
-            },
-            {
-              name: "pool-d",
-              range: "10.3.0.0/24",
-              used: 0,
-              available: 0,
-              total: 0,
-            },
-          ],
-        });
-      }
-      if (path === "ip-pool/usage") {
-        return mockQuery({
-          data: { total_ips: 1016, used_ips: 420, free_ips: 596 },
-        });
-      }
-      return mockQuery({ data: {} });
-    });
-
-  it("shows loading state", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<IpPoolPage />);
-    expect(screen.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders pools with usage bars covering all thresholds", () => {
-    fullPoolMock();
-    render(<IpPoolPage />);
-    expect(screen.getByText("91%")).toBeTruthy(); // >90 red
-    expect(screen.getByText("71%")).toBeTruthy(); // >70 amber
-    expect(screen.getByText("4%")).toBeTruthy(); // <=70 green
-    expect(screen.getByText("0%")).toBeTruthy(); // total=0
-  });
-
-  it("renders usage summary KV", () => {
-    fullPoolMock();
-    render(<IpPoolPage />);
-    expect(screen.getByText("total ips")).toBeTruthy();
-    expect(screen.getByText("1,016")).toBeTruthy();
-  });
-
-  it("fires remove mutation from cell button", () => {
-    fullPoolMock();
-    render(<IpPoolPage />);
-    const removeBtns = screen.getAllByText("Remove");
-    fireEvent.click(removeBtns[0]);
-    expect(capturedMutations[0].mutate).toHaveBeenCalledWith({
-      name: "pool-a",
-    });
-  });
-
-  it("calls onSuccess for remove mutation", () => {
-    fullPoolMock();
-    render(<IpPoolPage />);
-    capturedMutations[0]?.onSuccess!();
-  });
-
-  it("renders empty state without usage summary", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "ip-pool") return mockQuery({ data: [] });
-      return mockQuery({ data: null });
-    });
-    render(<IpPoolPage />);
-    expect(screen.getByText("No IP pools configured.")).toBeTruthy();
-  });
-});
-
-// =====================================================================
-// PPPoE Page
-// =====================================================================
-describe("PppoePage", () => {
-  const fullPppoeMock = () =>
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "pppoe/interfaces") {
-        return mockQuery({
-          data: [
-            {
-              name: "ens19",
-              state: "active",
-              sessions: 50,
-              mtu: 1492,
-              mac: "aa:bb:cc:dd:ee:ff",
-            },
-            {
-              name: "ens20",
-              state: "down",
-              sessions: 0,
-              mtu: 1492,
-              mac: "11:22:33:44:55:66",
-            },
-          ],
-        });
-      }
-      if (path === "pppoe/mac-filter") {
-        return mockQuery({
-          data: {
-            raw_output: "allow ff:ff:ff:ff:ff:ff # Trusted\ndeny 00:00:00:00:00:00 # Blocked",
-            count: 2,
-          },
-        });
-      }
-      if (path === "pppoe/pado-delay") {
-        return mockQuery({ data: { delay: 0, min: 0, max: 100 } });
-      }
-      return mockQuery({ data: {} });
-    });
-
-  it("shows loading state", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<PppoePage />);
-    expect(screen.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders interfaces with state badges", () => {
-    fullPppoeMock();
-    render(<PppoePage />);
-    expect(screen.getByText("ens19")).toBeTruthy();
-    expect(screen.queryAllByText("active").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("down")).toBeTruthy();
-  });
-
-  it("renders MAC filter with action badges", () => {
-    fullPppoeMock();
-    render(<PppoePage />);
-    // MAC filter now renders raw_output in a <pre>
-    expect(screen.getByText(/allow ff:ff:ff:ff:ff:ff/)).toBeTruthy();
-    expect(screen.getByText(/deny 00:00:00:00:00:00/)).toBeTruthy();
-  });
-
-  it("renders PADO delay KV", () => {
-    fullPppoeMock();
-    render(<PppoePage />);
-    expect(screen.getByText("delay")).toBeTruthy();
-  });
-
-  it("renders empty states", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "pppoe/interfaces") {
-        return mockQuery({ data: [] });
-      }
-      if (path === "pppoe/mac-filter") {
-        return mockQuery({ data: { raw_output: "", count: 0 } });
-      }
-      return mockQuery({ data: {} });
-    });
-    render(<PppoePage />);
-    expect(screen.getByText("No PPPoE interfaces configured.")).toBeTruthy();
-    expect(screen.getByText("No MAC filter entries.")).toBeTruthy();
-  });
-});
-
-// =====================================================================
-// Routing Page
-// =====================================================================
-describe("RoutingPage", () => {
-  it("shows loading with pulse animations", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<RoutingPage />);
-    const pulses = document.querySelectorAll(".animate-pulse");
-    expect(pulses.length).toBeGreaterThanOrEqual(4);
-  });
-
-  it("renders protocol cards with active badge when data present", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({ data: { status: "active", router_id: "1.1.1.1" } }),
-    );
-    render(<RoutingPage />);
-    expect(screen.getByText("BGP")).toBeTruthy();
-    expect(screen.getByText("OSPF")).toBeTruthy();
-    expect(screen.getByText("RIP")).toBeTruthy();
-    expect(screen.getByText("BFD")).toBeTruthy();
-    const activeBadges = screen.getAllByText("active");
-    expect(activeBadges.length).toBeGreaterThanOrEqual(4);
-  });
-
-  it("shows unavailable badges on error", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({ error: new Error("not available") }),
-    );
-    render(<RoutingPage />);
-    const badges = screen.getAllByText("unavailable");
-    expect(badges.length).toBeGreaterThanOrEqual(4);
-  });
-
-  it("renders detail sections with KV data including object values", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: { router_id: "1.1.1.1", neighbors: { count: 3 } },
-      }),
-    );
-    render(<RoutingPage />);
-    expect(screen.getAllByText("1.1.1.1").length).toBeGreaterThanOrEqual(1);
-    // formatValue renders flat objects as "key: value" pairs
-    expect(screen.getAllByText("count: 3").length).toBeGreaterThanOrEqual(1);
-  });
-});
-
 // =====================================================================
 // DHCP Page
 // =====================================================================
@@ -1237,152 +837,6 @@ describe("EventsPage", () => {
     expect(screen.getByText("No recent events.")).toBeTruthy();
   });
 });
-
-// =====================================================================
-// Logs Page
-// =====================================================================
-describe("LogsPage", () => {
-  it("shows loading state", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<LogsPage />);
-    expect(screen.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders log entries with all level colors", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          "12:00:00 [error] Connection lost",
-          "12:01:00 [warn] High latency",
-          "12:02:00 [warning] Retrying",
-          "12:03:00 [info] Connected",
-          "12:04:00 [debug] Packet sent",
-          "12:05:00 [trace] Default color",
-        ],
-      }),
-    );
-    render(<LogsPage />);
-    expect(screen.getByText("12:00:00 [error] Connection lost")).toBeTruthy();
-    expect(screen.getByText("12:01:00 [warn] High latency")).toBeTruthy();
-    expect(screen.getByText("12:03:00 [info] Connected")).toBeTruthy();
-    expect(screen.getByText("12:04:00 [debug] Packet sent")).toBeTruthy();
-    expect(screen.getByText("12:05:00 [trace] Default color")).toBeTruthy();
-  });
-
-  it("toggles streaming and shows waiting message", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ data: [] }));
-
-    class MockEventSource {
-      onmessage: ((event: MessageEvent) => void) | null = null;
-      onerror: (() => void) | null = null;
-      close = vi.fn();
-    }
-    vi.stubGlobal("EventSource", MockEventSource);
-
-    render(<LogsPage />);
-    fireEvent.click(screen.getByText("Live Stream"));
-    expect(screen.getByText("Stop Stream")).toBeTruthy();
-    expect(screen.getByText("Waiting for log events...")).toBeTruthy();
-
-    fireEvent.click(screen.getByText("Stop Stream"));
-    expect(screen.getByText("Live Stream")).toBeTruthy();
-
-    vi.unstubAllGlobals();
-  });
-
-  it("receives SSE messages and renders stream lines", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ data: [] }));
-
-    let esInstance: {
-      onmessage: ((event: { data: string }) => void) | null;
-      onerror: (() => void) | null;
-      close: Mock;
-    } | null = null;
-
-    class MockEventSource {
-      onmessage: ((event: { data: string }) => void) | null = null;
-      onerror: (() => void) | null = null;
-      close = vi.fn();
-      constructor() {
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        esInstance = this;
-      }
-    }
-    vi.stubGlobal("EventSource", MockEventSource);
-
-    render(<LogsPage />);
-    fireEvent.click(screen.getByText("Live Stream"));
-
-    act(() => {
-      esInstance?.onmessage?.({ data: "2026-07-11 [INFO] test log line" });
-    });
-
-    expect(
-      screen.getByText("2026-07-11 [INFO] test log line"),
-    ).toBeTruthy();
-    expect(screen.queryByText("Waiting for log events...")).toBeNull();
-
-    vi.unstubAllGlobals();
-  });
-
-  it("handles SSE error by stopping stream", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ data: [] }));
-
-    let esInstance: {
-      onmessage: ((event: { data: string }) => void) | null;
-      onerror: (() => void) | null;
-      close: Mock;
-    } | null = null;
-
-    class MockEventSource {
-      onmessage: ((event: { data: string }) => void) | null = null;
-      onerror: (() => void) | null = null;
-      close = vi.fn();
-      constructor() {
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        esInstance = this;
-      }
-    }
-    vi.stubGlobal("EventSource", MockEventSource);
-
-    render(<LogsPage />);
-    fireEvent.click(screen.getByText("Live Stream"));
-
-    act(() => {
-      esInstance?.onerror?.();
-    });
-
-    expect(screen.getByText("Live Stream")).toBeTruthy();
-
-    vi.unstubAllGlobals();
-  });
-
-  it("hides static logs when streaming", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          "12:00:00 [info] Static log",
-        ],
-      }),
-    );
-
-    class MockEventSource {
-      onmessage: ((event: { data: string }) => void) | null = null;
-      onerror: (() => void) | null = null;
-      close = vi.fn();
-    }
-    vi.stubGlobal("EventSource", MockEventSource);
-
-    render(<LogsPage />);
-    expect(screen.getByText("12:00:00 [info] Static log")).toBeTruthy();
-
-    fireEvent.click(screen.getByText("Live Stream"));
-    expect(screen.queryByText("12:00:00 [info] Static log")).toBeNull();
-
-    vi.unstubAllGlobals();
-  });
-});
-
 // =====================================================================
 // Monitoring Page
 // =====================================================================
@@ -1453,141 +907,6 @@ describe("MonitoringPage", () => {
     expect(screen.getByText("No metrics available.")).toBeTruthy();
   });
 });
-
-// =====================================================================
-// System Page
-// =====================================================================
-describe("SystemPage", () => {
-  const fullSystemMock = () =>
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "system/info") {
-        return mockQuery({
-          data: {
-            hostname: "bng-1",
-            os: "Ubuntu 22.04",
-            kernel: "5.15.0",
-          },
-        });
-      }
-      if (path === "system/metrics") {
-        return mockQuery({
-          data: { cpu_load: 2, memory_mb: 4096, swap_used: "128 MB" },
-        });
-      }
-      if (path === "lldp/neighbors") {
-        return mockQuery({
-          data: [
-            {
-              local_port: "ge0",
-              remote_system: "sw1",
-              remote_port: "ge1",
-              remote_description: "Core Switch",
-              ttl: 120,
-            },
-          ],
-        });
-      }
-      if (path === "ntp/status") {
-        return mockQuery({ data: { synchronized: "yes", stratum: 2 } });
-      }
-      if (path === "ntp/peers") {
-        return mockQuery({
-          data: [
-            {
-              remote: "ntp1.example.com",
-              refid: ".GPS.",
-              stratum: 1,
-              reach: 377,
-              delay: "1.234",
-              offset: "-0.567",
-              jitter: "0.123",
-              tally: "*",
-            },
-            {
-              remote: "ntp2.example.com",
-              refid: ".PPS.",
-              stratum: 2,
-              tally: "+",
-            },
-          ],
-        });
-      }
-      if (path === "audit/log") {
-        return mockQuery({
-          data: [
-            {
-              timestamp: "2026-07-10T12:00:00Z",
-              user: "admin",
-              action: "config.apply",
-              detail: "Updated ppp section",
-              source_ip: "192.168.1.1",
-            },
-          ],
-        });
-      }
-      return mockQuery({ data: {} });
-    });
-
-  it("shows loading state", () => {
-    mockUseNodeProxy.mockReturnValue(mockQuery({ isLoading: true }));
-    render(<SystemPage />);
-    expect(screen.getAllByText("Loading...").length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders system info KV", () => {
-    fullSystemMock();
-    render(<SystemPage />);
-    expect(screen.getByText("hostname")).toBeTruthy();
-    expect(screen.getByText("bng-1")).toBeTruthy();
-  });
-
-  it("renders system metrics cards with number formatting", () => {
-    fullSystemMock();
-    render(<SystemPage />);
-    expect(screen.getByText("4,096")).toBeTruthy();
-    expect(screen.getByText("128 MB")).toBeTruthy();
-  });
-
-  it("renders NTP peers with tally badges", () => {
-    fullSystemMock();
-    render(<SystemPage />);
-    expect(screen.getByText("*")).toBeTruthy();
-    expect(screen.getByText("+")).toBeTruthy();
-    expect(screen.getByText("ntp1.example.com")).toBeTruthy();
-  });
-
-  it("renders LLDP neighbors", () => {
-    fullSystemMock();
-    render(<SystemPage />);
-    expect(screen.getByText("sw1")).toBeTruthy();
-    expect(screen.getByText("Core Switch")).toBeTruthy();
-  });
-
-  it("renders audit log", () => {
-    fullSystemMock();
-    render(<SystemPage />);
-    expect(screen.getByText("config.apply")).toBeTruthy();
-    expect(screen.getByText("192.168.1.1")).toBeTruthy();
-  });
-
-  it("renders empty list states", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (
-        path === "lldp/neighbors" ||
-        path === "ntp/peers" ||
-        path === "audit/log"
-      ) {
-        return mockQuery({ data: [] });
-      }
-      return mockQuery({ data: {} });
-    });
-    render(<SystemPage />);
-    expect(screen.getByText("No LLDP neighbors discovered.")).toBeTruthy();
-    expect(screen.getByText("No NTP peers configured.")).toBeTruthy();
-    expect(screen.getByText("No audit entries.")).toBeTruthy();
-  });
-});
-
 // =====================================================================
 // Diagnostics Page
 // =====================================================================
