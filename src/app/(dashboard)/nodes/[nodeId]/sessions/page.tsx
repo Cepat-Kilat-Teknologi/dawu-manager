@@ -9,8 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { toast } from "sonner";
-import { Search, XCircle, RefreshCw, Loader2 } from "lucide-react";
+import {
+  Search,
+  XCircle,
+  RefreshCw,
+  Loader2,
+  Users,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Cpu,
+  Network,
+  Clock,
+} from "lucide-react";
 import { formatValue } from "@/lib/utils";
 
 interface PPPoESession {
@@ -22,6 +34,38 @@ interface PPPoESession {
   rate_limit: string;
   uptime: string;
   state: string;
+}
+
+/**
+ * Live counters from `sessions/stats`. accel-ppp returns every value as a
+ * STRING (e.g. `cpu_percent: "0"`). `pool_used` is 0 on RADIUS-driven setups
+ * because subscriber IPs are assigned via Framed-IP, not the local ippool.
+ */
+interface SessionStats {
+  active?: string | number;
+  starting?: string | number;
+  finishing?: string | number;
+  cpu_percent?: string | number;
+  pool_used?: string | number;
+  pool_total?: string | number;
+  uptime?: string | number;
+}
+
+/** Stat keys shown as dedicated tiles; any other key falls through to "extras". */
+const KNOWN_STAT_KEYS = [
+  "active",
+  "starting",
+  "finishing",
+  "cpu_percent",
+  "pool_used",
+  "pool_total",
+  "uptime",
+];
+
+/** Display a stat value, dashing null / undefined / empty string. */
+function statValue(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "—";
+  return String(value);
 }
 
 /**
@@ -41,7 +85,13 @@ export default function SessionsPage() {
     { refetchInterval: 15_000, extract: "sessions" },
   );
 
-  const stats = useNodeProxy<Record<string, unknown>>(nodeId, "sessions/stats");
+  const stats = useNodeProxy<SessionStats>(nodeId, "sessions/stats");
+  const s = stats.data;
+  const cpuRaw = statValue(s?.cpu_percent);
+  const cpuText = cpuRaw === "—" ? "—" : `${cpuRaw}%`;
+  const extraStats = s
+    ? Object.entries(s).filter(([key]) => !KNOWN_STAT_KEYS.includes(key))
+    : [];
 
   const terminateMutation = useNodeProxyMutation<{ username: string }>(
     nodeId,
@@ -121,17 +171,64 @@ export default function SessionsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Stats row */}
-      {stats.data && (
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-          {Object.entries(stats.data).map(([key, val]) => (
-            <div key={key} className="rounded-lg border bg-card p-3">
-              <p className="text-xs text-muted-foreground capitalize">
-                {key.replace(/_/g, " ")}
-              </p>
-              <p className="text-lg font-semibold">{formatValue(val)}</p>
+      {/* Live session counters */}
+      {s && (
+        <div className="content-fade-in space-y-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <StatCard
+              title="Active sessions"
+              value={statValue(s.active)}
+              icon={Users}
+              variant="success"
+              description="PPPoE subscribers online"
+            />
+            <StatCard
+              title="Starting"
+              value={statValue(s.starting)}
+              icon={ArrowUpCircle}
+              description="Sessions negotiating"
+            />
+            <StatCard
+              title="Finishing"
+              value={statValue(s.finishing)}
+              icon={ArrowDownCircle}
+              description="Sessions tearing down"
+            />
+            <StatCard
+              title="CPU"
+              value={cpuText}
+              icon={Cpu}
+              description="accel-ppp process load"
+            />
+            <StatCard
+              title="Pool used / total"
+              value={`${statValue(s.pool_used)} / ${statValue(s.pool_total)}`}
+              icon={Network}
+              description="Local pool — subscriber IPs are RADIUS-assigned"
+            />
+            <StatCard
+              title="Uptime"
+              value={statValue(s.uptime)}
+              icon={Clock}
+              description="accel-ppp daemon uptime"
+            />
+          </div>
+
+          {extraStats.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {extraStats.map(([key, val]) => (
+                <div
+                  key={key}
+                  className="rounded-lg border border-border bg-card p-3"
+                >
+                  <p className="text-xs capitalize text-muted-foreground">
+                    {key.replace(/_/g, " ")}
+                  </p>
+                  <p className="text-lg font-semibold">{formatValue(val)}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 

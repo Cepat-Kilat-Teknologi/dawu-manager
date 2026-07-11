@@ -4,6 +4,12 @@ import { useParams } from "next/navigation";
 import { useNodeProxy } from "@/hooks/use-node-proxy";
 import { NodePageShell } from "@/components/node/node-page-shell";
 import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-table";
+import {
+  AddRouteDialog,
+  DeleteRouteButton,
+  AddVlanDialog,
+  DeleteVlanButton,
+} from "@/components/node/network-crud";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
@@ -73,6 +79,22 @@ function stateVariant(state: string | undefined): "default" | "destructive" | "o
 }
 
 /**
+ * Derive a human-meaningful link state for the interfaces table.
+ * `ppp*` interfaces report `state:"UNKNOWN"` while carrying flags like
+ * `["POINTOPOINT","UP","LOWER_UP"]` — treat those as `UP`. `UNKNOWN` with no
+ * `UP`/`LOWER_UP` flag is effectively `DOWN`. `UP`/`DOWN` pass through unchanged;
+ * any other value is kept as-is (em dash when missing).
+ */
+function deriveLinkState(state: string | undefined, flags: string[] | undefined): string {
+  if (state === "UP" || state === "DOWN") return state;
+  if (state === "UNKNOWN") {
+    const isUp = (flags ?? []).some((f) => f === "UP" || f === "LOWER_UP");
+    return isUp ? "UP" : "DOWN";
+  }
+  return state ?? "—";
+}
+
+/**
  * Derive an `address/prefix` string for the first address of the given family,
  * or `null` when the interface has no address of that family.
  */
@@ -112,7 +134,10 @@ export default function NetworkPage() {
     { header: "Name", accessorKey: "name", className: "font-medium" },
     {
       header: "State",
-      cell: (row) => <Badge variant={stateVariant(row.state)}>{row.state}</Badge>,
+      cell: (row) => {
+        const display = deriveLinkState(row.state, row.flags);
+        return <Badge variant={stateVariant(display)}>{display}</Badge>;
+      },
     },
     {
       header: "IPv4",
@@ -147,6 +172,10 @@ export default function NetworkPage() {
     { header: "Device", cell: (row) => <span>{orDash(row.device)}</span> },
     { header: "Protocol", cell: (row) => <span>{orDash(row.protocol)}</span> },
     { header: "Metric", cell: (row) => <span>{orDash(row.metric)}</span> },
+    {
+      header: "Actions",
+      cell: (row) => <DeleteRouteButton nodeId={nodeId} route={row} />,
+    },
   ];
 
   const vlanColumns: ProxyColumn<VlanEntry>[] = [
@@ -157,6 +186,10 @@ export default function NetworkPage() {
     {
       header: "State",
       cell: (row) => <Badge variant={stateVariant(row.state)}>{row.state ?? "—"}</Badge>,
+    },
+    {
+      header: "Actions",
+      cell: (row) => <DeleteVlanButton nodeId={nodeId} vlan={row} />,
     },
   ];
 
@@ -181,32 +214,42 @@ export default function NetworkPage() {
         <ProxyDataTable columns={ifColumns} data={interfaces.data ?? []} getRowKey={(r) => r.name} />
       </NodePageShell>
 
-      <NodePageShell
-        title={`Routes (${routes.data?.length ?? 0})`}
-        isLoading={routes.isLoading}
-        error={routes.error}
-        onRetry={() => routes.refetch()}
-        isEmpty={routes.data?.length === 0}
-        emptyMessage="No routes configured."
-      >
-        <ProxyDataTable columns={routeColumns} data={routes.data ?? []} />
-      </NodePageShell>
+      <div className="space-y-3">
+        <div className="flex justify-end">
+          <AddRouteDialog nodeId={nodeId} />
+        </div>
+        <NodePageShell
+          title={`Routes (${routes.data?.length ?? 0})`}
+          isLoading={routes.isLoading}
+          error={routes.error}
+          onRetry={() => routes.refetch()}
+          isEmpty={routes.data?.length === 0}
+          emptyMessage="No routes configured."
+        >
+          <ProxyDataTable columns={routeColumns} data={routes.data ?? []} />
+        </NodePageShell>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <NodePageShell
-          title={`VLANs (${vlans.length})`}
-          isLoading={vlansRaw.isLoading}
-          error={vlansRaw.error}
-          onRetry={() => vlansRaw.refetch()}
-          isEmpty={vlans.length === 0}
-          emptyMessage="No VLANs configured."
-        >
-          <ProxyDataTable
-            columns={vlanColumns}
-            data={vlans}
-            getRowKey={(r) => `${r.vlan_id}-${r.name}`}
-          />
-        </NodePageShell>
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <AddVlanDialog nodeId={nodeId} />
+          </div>
+          <NodePageShell
+            title={`VLANs (${vlans.length})`}
+            isLoading={vlansRaw.isLoading}
+            error={vlansRaw.error}
+            onRetry={() => vlansRaw.refetch()}
+            isEmpty={vlans.length === 0}
+            emptyMessage="No VLANs configured."
+          >
+            <ProxyDataTable
+              columns={vlanColumns}
+              data={vlans}
+              getRowKey={(r) => `${r.vlan_id}-${r.name}`}
+            />
+          </NodePageShell>
+        </div>
 
         <NodePageShell
           title="DNS Configuration"

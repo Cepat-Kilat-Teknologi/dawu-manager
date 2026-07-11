@@ -67,8 +67,14 @@ beforeEach(() => {
   mutationMap.clear();
   mockUseNodeProxy.mockReturnValue(mockQuery());
   mockUseNodeProxyMutation.mockImplementation(
-    (_nid: string, _path: string, opts?: { onSuccess?: () => void }) => {
-      const key = `${_nid}:${_path}`;
+    (
+      _nid: string,
+      _path: string,
+      opts?: { onSuccess?: () => void; method?: string },
+    ) => {
+      // Key by path AND method: add (POST) and remove (DELETE) share the
+      // "ip-pool" path but are distinct mutations.
+      const key = `${_nid}:${_path}:${opts?.method ?? "POST"}`;
       if (!mutationMap.has(key)) {
         const m: CapturedMutation = {
           mutate: vi.fn(),
@@ -196,5 +202,79 @@ describe("IpPoolPage", () => {
     render(<IpPoolPage />);
     fireEvent.click(screen.getByText("Refresh"));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  const withUsage = () =>
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "ip-pool") return mockQuery({ data: [] });
+      if (path === "ip-pool/usage")
+        return mockQuery({ data: { used: "0", total: "253", available: "253" } });
+      return mockQuery();
+    });
+
+  it("creates a pool via the Add Pool dialog", () => {
+    withUsage();
+    render(<IpPoolPage />);
+    fireEvent.click(screen.getByText("Add Pool"));
+    fireEvent.change(screen.getByLabelText(/Name/), {
+      target: { value: "soho" },
+    });
+    fireEvent.change(screen.getByLabelText(/IP range/), {
+      target: { value: "10.20.0.0/24" },
+    });
+    fireEvent.click(screen.getByText("Create Pool"));
+    // capturedMutations[1] is the POST (add) mutation.
+    expect(capturedMutations[1].mutate).toHaveBeenCalledWith({
+      name: "soho",
+      ip_range: "10.20.0.0/24",
+    });
+  });
+
+  it("disables Create until both fields are filled", () => {
+    withUsage();
+    render(<IpPoolPage />);
+    fireEvent.click(screen.getByText("Add Pool"));
+    const create = screen.getByText("Create Pool").closest("button")!;
+    expect(create.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "x" } });
+    expect(create.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/IP range/), {
+      target: { value: "10.0.0.0/24" },
+    });
+    expect(create.disabled).toBe(false);
+  });
+
+  it("shows a pending spinner and success toast on create", () => {
+    withUsage();
+    render(<IpPoolPage />);
+    // Fire the add mutation's onSuccess (toast + reset).
+    capturedMutations[1]?.onSuccess?.();
+    expect(toast.success).toHaveBeenCalledWith("Pool created");
+  });
+
+  it("cancels the Add Pool dialog", () => {
+    withUsage();
+    render(<IpPoolPage />);
+    fireEvent.click(screen.getByText("Add Pool"));
+    expect(screen.getByText("Add IP Pool")).toBeTruthy();
+    fireEvent.click(screen.getByText("Cancel"));
+    // Dialog content is unmounted once closed.
+    expect(screen.queryByText("Add IP Pool")).toBeNull();
+  });
+
+  it("shows Creating… while the add mutation is pending", () => {
+    withUsage();
+    // Force the POST (add) mutation into a pending state.
+    mockUseNodeProxyMutation.mockImplementation(
+      (_nid: string, _path: string, opts?: { onSuccess?: () => void; method?: string }) => ({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: opts?.method === "POST",
+        onSuccess: opts?.onSuccess,
+      }),
+    );
+    render(<IpPoolPage />);
+    fireEvent.click(screen.getByText("Add Pool"));
+    expect(screen.getByText("Creating…")).toBeTruthy();
   });
 });

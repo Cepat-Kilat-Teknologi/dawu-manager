@@ -81,6 +81,40 @@ describe("NodePageShell", () => {
     expect(screen.getByText("No data available.")).toBeTruthy();
   });
 
+  it("keeps actions visible in the empty state", () => {
+    render(
+      <NodePageShell
+        title="Pools"
+        isLoading={false}
+        error={null}
+        isEmpty={true}
+        actions={<button>Add Pool</button>}
+      >
+        <p>Content</p>
+      </NodePageShell>,
+    );
+    // The Add action must remain reachable when there is nothing yet.
+    expect(screen.getByText("Add Pool")).toBeTruthy();
+    expect(screen.getByText("No data available.")).toBeTruthy();
+  });
+
+  it("renders an unavailableHint under the 404 note", () => {
+    render(
+      <NodePageShell
+        title="Metrics"
+        isLoading={false}
+        error={new ProxyError("Request failed (404)", 404)}
+        unavailableHint={<span>Start node_exporter to enable metrics.</span>}
+      >
+        <p>Content</p>
+      </NodePageShell>,
+    );
+    expect(screen.getByText(/Not available on this node/)).toBeTruthy();
+    expect(
+      screen.getByText("Start node_exporter to enable metrics."),
+    ).toBeTruthy();
+  });
+
   it("renders content with title and actions", () => {
     render(
       <NodePageShell

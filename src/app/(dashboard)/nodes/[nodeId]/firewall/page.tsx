@@ -21,6 +21,8 @@ import {
   Activity,
   ArrowRightLeft,
   Boxes,
+  ShieldCheck,
+  Info,
   type LucideIcon,
 } from "lucide-react";
 
@@ -167,6 +169,8 @@ function OptionalFeature({
 export default function FirewallPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
   const [filter, setFilter] = useState("");
+  // Tracks whether the pending ruleset passed validation, to nudge validate-before-save.
+  const [validated, setValidated] = useState(false);
 
   const rules = useNodeProxy<{ raw_output: string; rules_count: number }>(
     nodeId,
@@ -192,8 +196,27 @@ export default function FirewallPage() {
   });
 
   const saveMutation = useNodeProxyMutation(nodeId, "firewall/save", {
-    onSuccess: () => toast.success("Firewall rules saved"),
+    onSuccess: () => {
+      toast.success("Firewall rules saved");
+      // A saved ruleset is now live; require a fresh validation before the next save.
+      setValidated(false);
+    },
   });
+  const validateMutation = useNodeProxyMutation(nodeId, "firewall/validate");
+
+  /** Validate the pending ruleset; success unlocks the "safe to save" hint. */
+  async function handleValidate() {
+    try {
+      await validateMutation.mutateAsync({});
+      setValidated(true);
+      toast.success("Ruleset valid");
+    } catch (err) {
+      setValidated(false);
+      const msg =
+        err instanceof Error ? err.message : "Ruleset validation failed.";
+      toast.error("Validation failed", { description: msg });
+    }
+  }
 
   const rawOutput = rules.data?.raw_output ?? "";
   const term = filter.trim();
@@ -222,6 +245,19 @@ export default function FirewallPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={handleValidate}
+              disabled={validateMutation.isPending}
+            >
+              {validateMutation.isPending ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Validate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => saveMutation.mutate({})}
               disabled={saveMutation.isPending}
             >
@@ -239,6 +275,20 @@ export default function FirewallPage() {
         }
       >
         <div className="space-y-3">
+          <p
+            className={`flex items-center gap-1.5 text-xs ${
+              validated ? "text-success" : "text-muted-foreground"
+            }`}
+          >
+            {validated ? (
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Info className="h-3.5 w-3.5 shrink-0" />
+            )}
+            {validated
+              ? "Ruleset validated — safe to save."
+              : "Tip: click Validate to check the ruleset before saving."}
+          </p>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Filter className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />

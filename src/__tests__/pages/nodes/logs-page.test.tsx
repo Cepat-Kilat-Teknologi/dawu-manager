@@ -189,6 +189,39 @@ describe("LogsPage", () => {
     expect(refetch).toHaveBeenCalled();
   });
 
+  it("appends the selected systemd unit to the tail request", () => {
+    mockUseNodeProxy.mockReturnValue(mockQuery({ data: tail([]) }));
+    render(<LogsPage />);
+    // Default unit is accel-ppp.
+    expect(
+      mockUseNodeProxy.mock.calls.some(
+        (c) => c[1] === "logs/tail?lines=500&unit=accel-ppp",
+      ),
+    ).toBe(true);
+    // Switching the unit re-keys the tail query with the new unit.
+    fireEvent.change(screen.getByLabelText("Systemd unit"), {
+      target: { value: "ssh" },
+    });
+    expect(
+      mockUseNodeProxy.mock.calls.some(
+        (c) => c[1] === "logs/tail?lines=500&unit=ssh",
+      ),
+    ).toBe(true);
+  });
+
+  it("notes the journald limitation for the selected unit", () => {
+    mockUseNodeProxy.mockReturnValue(mockQuery({ data: tail([]) }));
+    render(<LogsPage />);
+    expect(
+      screen.getByText(/systemd journal for unit "accel-ppp"/),
+    ).toBeTruthy();
+    // The note tracks the selected unit.
+    fireEvent.change(screen.getByLabelText("Systemd unit"), {
+      target: { value: "cron" },
+    });
+    expect(screen.getByText(/systemd journal for unit "cron"/)).toBeTruthy();
+  });
+
   it("streams live log events then stops", () => {
     mockUseNodeProxy.mockReturnValue(mockQuery({ data: tail([]) }));
 

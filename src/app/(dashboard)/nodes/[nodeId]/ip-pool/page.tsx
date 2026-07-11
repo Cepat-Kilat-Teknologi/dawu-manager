@@ -1,12 +1,23 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { useNodeProxy, useNodeProxyMutation } from "@/hooks/use-node-proxy";
 import { NodePageShell } from "@/components/node/node-page-shell";
 import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-table";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Plus, Loader2 } from "lucide-react";
 
 interface IpPool {
   name: string;
@@ -50,6 +61,9 @@ function usageBarColor(pct: number): string {
  */
 export default function IpPoolPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
+  const [addOpen, setAddOpen] = useState(false);
+  const [poolName, setPoolName] = useState("");
+  const [ipRange, setIpRange] = useState("");
 
   const pools = useNodeProxy<IpPool[]>(nodeId, "ip-pool", {
     refetchInterval: 30_000,
@@ -64,6 +78,21 @@ export default function IpPoolPage() {
       method: "DELETE",
       invalidates: ["ip-pool"],
       onSuccess: () => toast.success("Pool removed"),
+    },
+  );
+
+  const addMutation = useNodeProxyMutation<{ name: string; ip_range: string }>(
+    nodeId,
+    "ip-pool",
+    {
+      method: "POST",
+      invalidates: ["ip-pool"],
+      onSuccess: () => {
+        toast.success("Pool created");
+        setAddOpen(false);
+        setPoolName("");
+        setIpRange("");
+      },
     },
   );
 
@@ -155,13 +184,82 @@ export default function IpPoolPage() {
         isEmpty={pools.data?.length === 0}
         emptyMessage={`No named IP pools defined on this node. ${available.toLocaleString()} addresses available for allocation.`}
         actions={
-          <Button variant="outline" size="sm" onClick={() => pools.refetch()}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Pool
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => pools.refetch()}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+            </Button>
+          </div>
         }
       >
         <ProxyDataTable columns={columns} data={pools.data ?? []} getRowKey={(r) => r.name} />
       </NodePageShell>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add IP Pool</DialogTitle>
+            <DialogDescription>
+              Define a named address pool for accel-ppp to allocate from.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              addMutation.mutate({ name: poolName, ip_range: ipRange });
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="pool-name">Name</Label>
+              <Input
+                id="pool-name"
+                placeholder="soho"
+                value={poolName}
+                onChange={(e) => setPoolName(e.target.value)}
+                required
+                disabled={addMutation.isPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pool-range">
+                IP range{" "}
+                <span className="font-normal text-muted-foreground">(CIDR)</span>
+              </Label>
+              <Input
+                id="pool-range"
+                className="font-mono"
+                placeholder="10.20.0.0/24"
+                value={ipRange}
+                onChange={(e) => setIpRange(e.target.value)}
+                required
+                disabled={addMutation.isPending}
+              />
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddOpen(false)}
+                disabled={addMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={addMutation.isPending || !poolName || !ipRange}
+              >
+                {addMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {addMutation.isPending ? "Creating…" : "Create Pool"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,7 +7,8 @@
  * tiles (available data, 404/405 unavailable, non-unavailable errors, null).
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import "@/__tests__/ui-mocks";
 
 interface CapturedMutation {
@@ -361,5 +362,100 @@ describe("FirewallPage", () => {
     expect(refetch).toHaveBeenCalledTimes(2);
     // Optional features with a plain Error render the non-fatal "Error" badge.
     expect(screen.getAllByText("Error").length).toBe(4);
+  });
+
+  // ---- Validate ruleset -----------------------------------------------------
+
+  it("shows the validate-before-save hint and validates the ruleset", async () => {
+    withRulesAndSysctl(() => undefined);
+    render(<FirewallPage />);
+    // The nudge encourages validating before saving.
+    expect(
+      screen.getByText(
+        "Tip: click Validate to check the ruleset before saving.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Validate"));
+    const validate = mutationMap.get("n1:firewall/validate")!;
+    // firewall/validate takes an empty body.
+    expect(validate.mutateAsync).toHaveBeenCalledWith({});
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Ruleset valid"),
+    );
+    // Hint flips to the "safe to save" state.
+    await waitFor(() =>
+      expect(
+        screen.getByText("Ruleset validated — safe to save."),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("surfaces a validation error message (Error branch)", async () => {
+    withRulesAndSysctl(() => undefined);
+    render(<FirewallPage />);
+    mutationMap.get("n1:firewall/validate")!.mutateAsync = vi
+      .fn()
+      .mockRejectedValue(new ProxyError("chain input: syntax error", 400));
+    fireEvent.click(screen.getByText("Validate"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Validation failed", {
+        description: "chain input: syntax error",
+      }),
+    );
+    // Hint remains in the un-validated state.
+    expect(
+      screen.getByText(
+        "Tip: click Validate to check the ruleset before saving.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("surfaces a validation error with the fallback message (non-Error branch)", async () => {
+    withRulesAndSysctl(() => undefined);
+    render(<FirewallPage />);
+    mutationMap.get("n1:firewall/validate")!.mutateAsync = vi
+      .fn()
+      .mockRejectedValue("boom");
+    fireEvent.click(screen.getByText("Validate"));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Validation failed", {
+        description: "Ruleset validation failed.",
+      }),
+    );
+  });
+
+  it("disables Validate while its mutation is pending", () => {
+    mockUseNodeProxyMutation.mockImplementation(
+      (_nid: string, path: string, opts?: { onSuccess?: () => void }) => ({
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: path === "firewall/validate",
+        onSuccess: opts?.onSuccess,
+      }),
+    );
+    withRulesAndSysctl(() => undefined);
+    render(<FirewallPage />);
+    expect(screen.getByText("Validate").closest("button")?.disabled).toBe(true);
+  });
+
+  it("resets the validated hint after a successful save", async () => {
+    withRulesAndSysctl(() => undefined);
+    render(<FirewallPage />);
+    fireEvent.click(screen.getByText("Validate"));
+    await waitFor(() =>
+      expect(
+        screen.getByText("Ruleset validated — safe to save."),
+      ).toBeTruthy(),
+    );
+    // Saving invalidates the prior validation; the nudge returns.
+    mutationMap.get("n1:firewall/save")!.onSuccess!();
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Tip: click Validate to check the ruleset before saving.",
+        ),
+      ).toBeTruthy(),
+    );
   });
 });

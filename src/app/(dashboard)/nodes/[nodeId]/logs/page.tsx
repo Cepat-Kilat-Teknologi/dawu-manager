@@ -5,12 +5,26 @@ import { useNodeProxy } from "@/hooks/use-node-proxy";
 import { NodePageShell } from "@/components/node/node-page-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Copy, Download, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 /** Selectable tail sizes for the log viewer. */
 const LINE_OPTIONS = [100, 500, 1000, 5000] as const;
+
+/**
+ * Preset systemd units offered as datalist suggestions. accel-ppp is the
+ * default even though it barely logs to journald (see the note in the body).
+ * The field is free-text, so any systemd unit name is accepted.
+ */
+const UNIT_OPTIONS = [
+  "accel-ppp",
+  "ssh",
+  "systemd-networkd",
+  "cron",
+  "kernel",
+] as const;
 
 /** Shape of the dawos-agent `logs/tail` response. */
 interface LogTail {
@@ -41,14 +55,18 @@ function lineColor(line: string): string {
 export default function LogsPage() {
   const { nodeId } = useParams<{ nodeId: string }>();
   const [lineCount, setLineCount] = useState<number>(500);
+  const [unit, setUnit] = useState<string>("accel-ppp");
   const [streaming, setStreaming] = useState(false);
   const [streamLines, setStreamLines] = useState<string[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Passing the size through the path query string re-keys the query so the
-  // tail refetches automatically whenever the selector changes.
-  const logs = useNodeProxy<LogTail>(nodeId, `logs/tail?lines=${lineCount}`);
+  // Passing the size + unit through the path query string re-keys the query so
+  // the tail refetches automatically whenever either selector changes.
+  const logs = useNodeProxy<LogTail>(
+    nodeId,
+    `logs/tail?lines=${lineCount}&unit=${unit}`,
+  );
 
   // SSE streaming — kept intact from the original implementation.
   useEffect(() => {
@@ -114,6 +132,19 @@ export default function LogsPage() {
               <span className="font-mono text-foreground">{source}</span>
             </span>
             <Badge variant="outline">{tailLines.length} lines</Badge>
+            <Input
+              aria-label="Systemd unit"
+              list="log-units"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              placeholder="systemd unit"
+              className="h-9 w-40"
+            />
+            <datalist id="log-units">
+              {UNIT_OPTIONS.map((u) => (
+                <option key={u} value={u} />
+              ))}
+            </datalist>
             <div
               className="flex items-center gap-1"
               role="group"
@@ -167,6 +198,13 @@ export default function LogsPage() {
           </div>
         }
       >
+        <p className="mb-3 text-xs text-muted-foreground">
+          {`systemd journal for unit "${unit}". accel-ppp writes detailed session logs to `}
+          <span className="font-mono text-foreground">
+            /var/log/accel-ppp/accel-ppp.log
+          </span>
+          {" (not exposed via journald)."}
+        </p>
         <div className="rounded-md bg-muted/50 p-3 font-mono text-xs max-h-[600px] overflow-auto space-y-0.5">
           {/* Static log entries — full, untrimmed, wrapped, colour-coded */}
           {!streaming &&

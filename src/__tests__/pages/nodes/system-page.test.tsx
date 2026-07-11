@@ -215,6 +215,30 @@ describe("SystemPage", () => {
     expect(screen.queryAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("dashes empty-string NTP fields instead of leaving them blank", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "ntp/status") {
+        return mockQuery({
+          data: {
+            synced: false,
+            reference: "",
+            stratum: 0,
+            system_time_offset: "",
+            last_offset: "",
+            frequency: "",
+            raw_output: "",
+          },
+        });
+      }
+      return mockQuery();
+    });
+    render(<SystemPage />);
+    expect(screen.getByText("Not synced")).toBeTruthy();
+    // stratum 0 is a real value → "0"; every empty string field dashes
+    expect(screen.getByText("0")).toBeTruthy();
+    expect(screen.queryAllByText("—").length).toBeGreaterThanOrEqual(4);
+  });
+
   it("renders LLDP neighbours", () => {
     mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
       if (path === "lldp/neighbors") {
@@ -238,13 +262,18 @@ describe("SystemPage", () => {
     expect(screen.getByText("Core")).toBeTruthy();
   });
 
-  it("renders empty LLDP state", () => {
+  it("renders empty LLDP state with a muted explanation note", () => {
     mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
       if (path === "lldp/neighbors") return mockQuery({ data: [] });
       return mockQuery();
     });
     render(<SystemPage />);
     expect(screen.getByText("No LLDP neighbors discovered.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "LLDP is active; no neighbours are advertising on connected links.",
+      ),
+    ).toBeTruthy();
   });
 
   it("retries every section on error", () => {

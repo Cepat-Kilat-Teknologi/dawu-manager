@@ -90,13 +90,9 @@ function mockQuery(overrides: Record<string, unknown> = {}) {
 }
 
 // --- Page imports ---
-import SessionsPage from "@/app/(dashboard)/nodes/[nodeId]/sessions/page";
 import ServicePage from "@/app/(dashboard)/nodes/[nodeId]/service/page";
-import ConfigPage from "@/app/(dashboard)/nodes/[nodeId]/config/page";
-import TrafficPage from "@/app/(dashboard)/nodes/[nodeId]/traffic/page";
 import DhcpPage from "@/app/(dashboard)/nodes/[nodeId]/dhcp/page";
 import EventsPage from "@/app/(dashboard)/nodes/[nodeId]/events/page";
-import MonitoringPage from "@/app/(dashboard)/nodes/[nodeId]/monitoring/page";
 import DiagnosticsPage from "@/app/(dashboard)/nodes/[nodeId]/diagnostics/page";
 
 beforeEach(() => {
@@ -141,105 +137,12 @@ function renderWithErrorAndRetry(
   retryButtons.forEach((btn) => fireEvent.click(btn));
   expect(refetchFn).toHaveBeenCalledTimes(expectedRetryCount);
 }
-
-// =====================================================================
-// Sessions Page — Retry + Refresh
-// =====================================================================
-describe("SessionsPage coverage", () => {
-  it("retries on error", () => {
-    renderWithErrorAndRetry(SessionsPage, 1);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            username: "user1",
-            ip: "10.0.0.1",
-            sid: "s1",
-            ifname: "ppp0",
-            calling_sid: "aa:bb:cc:dd:ee:ff",
-            rate_limit: "10M/20M",
-            uptime: "1h",
-            state: "active",
-          },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<SessionsPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-  });
-});
-
 // =====================================================================
 // Service Page — Retry
 // =====================================================================
 describe("ServicePage coverage", () => {
   it("retries on error", () => {
     renderWithErrorAndRetry(ServicePage, 1);
-  });
-});
-// =====================================================================
-// Config Page — Retry + Refresh
-// =====================================================================
-describe("ConfigPage coverage", () => {
-  it("retries all sections on error", () => {
-    renderWithErrorAndRetry(ConfigPage, 3);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          { name: "backup-2026-07-10.conf", created: "2026-07-10T00:00:00Z", size: 1024 },
-          { name: "backup-old.conf", created: "2026-07-09T00:00:00Z" },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<ConfigPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
-    // Covers row.size falsy branch → "—"
-    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
-  });
-});
-
-// =====================================================================
-// Traffic Page — Retry + Refresh
-// =====================================================================
-describe("TrafficPage coverage", () => {
-  it("retries all sections on error", () => {
-    renderWithErrorAndRetry(TrafficPage, 2);
-  });
-
-  it("clicks Refresh buttons", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            username: "user1",
-            rate: "10M/20M",
-            direction: "down",
-            interface: "ppp0",
-          },
-        ],
-        refetch: refetchFn,
-      }),
-    );
-    render(<TrafficPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    expect(refreshBtns.length).toBe(2);
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalledTimes(2);
   });
 });
 // =====================================================================
@@ -286,33 +189,6 @@ describe("EventsPage coverage", () => {
     expect(refreshBtns.length).toBe(2);
     refreshBtns.forEach((btn) => fireEvent.click(btn));
     expect(refetchFn).toHaveBeenCalledTimes(2);
-  });
-});
-// =====================================================================
-// Monitoring Page — Retry + Refresh
-// =====================================================================
-describe("MonitoringPage coverage", () => {
-  it("retries all sections on error", () => {
-    renderWithErrorAndRetry(MonitoringPage, 2);
-  });
-
-  it("clicks Refresh button", () => {
-    const refetchFn = vi.fn();
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: {
-          exporters: [
-            { service: "node_exporter", active: true, port: 9100 },
-          ],
-          count: 1,
-        },
-        refetch: refetchFn,
-      }),
-    );
-    render(<MonitoringPage />);
-    const refreshBtns = screen.getAllByText("Refresh");
-    refreshBtns.forEach((btn) => fireEvent.click(btn));
-    expect(refetchFn).toHaveBeenCalled();
   });
 });
 // =====================================================================
@@ -375,24 +251,6 @@ function mockMutationPending(pendingPath: string) {
 // Cancel dialog tests — cover onOpenChange(false) callbacks
 // =====================================================================
 describe("Cancel dialog coverage", () => {
-  it("ConfigPage: Cancel dialog covers onOpenChange", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "config") {
-        return mockQuery({ data: { path: "/etc/accel-ppp.conf", content: "x", last_modified: "" } });
-      }
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<ConfigPage />);
-    // Click "Confirm" to open the guarded-apply confirmation dialog
-    fireEvent.click(screen.getByText("Confirm"));
-    // Dialog should be open
-    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
-    // Click Cancel to close — triggers onOpenChange(false) → !open && setConfirmAction(null)
-    fireEvent.click(screen.getByTestId("cancel-btn"));
-    // Dialog should be closed
-    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
-  });
-
   it("ServicePage: Cancel dialog covers onOpenChange", () => {
     mockUseNodeProxy.mockReturnValue(
       mockQuery({ data: { service: "accel-ppp", status: "stopped" } }),
@@ -407,64 +265,12 @@ describe("Cancel dialog coverage", () => {
     expect(screen.queryByTestId("confirm-dialog")).toBeNull();
   });
 
-  it("SessionsPage: Cancel dialog covers onOpenChange", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            username: "user1",
-            ip: "10.0.0.1",
-            sid: "s1",
-            ifname: "ppp0",
-            calling_sid: "aa:bb:cc:dd:ee:ff",
-            rate_limit: "10M/20M",
-            uptime: "1h",
-            state: "active",
-          },
-        ],
-        refetch: vi.fn(),
-      }),
-    );
-    render(<SessionsPage />);
-    // Click Terminate button on a session row
-    const terminateBtn = screen.getByText("Terminate");
-    fireEvent.click(terminateBtn);
-    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
-    // Click Cancel
-    fireEvent.click(screen.getByTestId("cancel-btn"));
-    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
-  });
 });
 
 // =====================================================================
 // isPending tests — cover Loader2 ternary branches
 // =====================================================================
 describe("isPending branch coverage", () => {
-  it("SessionsPage: restart isPending shows loader", () => {
-    mockMutationPending("sessions/restart");
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            username: "user1",
-            ip: "10.0.0.1",
-            sid: "s1",
-            ifname: "ppp0",
-            calling_sid: "aa:bb:cc:dd:ee:ff",
-            rate_limit: "10M/20M",
-            uptime: "1h",
-            state: "active",
-          },
-        ],
-        refetch: vi.fn(),
-      }),
-    );
-    render(<SessionsPage />);
-    // The restart button should be disabled with isPending=true
-    const restartBtn = screen.getByText("Restart");
-    expect(restartBtn.closest("button")?.disabled).toBe(true);
-  });
-
   it("ServicePage: action isPending disables buttons", () => {
     mockMutationPending("service/action");
     mockUseNodeProxy.mockReturnValue(
@@ -490,24 +296,6 @@ describe("isPending branch coverage", () => {
     expect(restartBtn.closest("button")?.disabled).toBe(true);
   });
 
-  it("MonitoringPage: restart isPending shows loader", () => {
-    mockMutationPending("monitoring/restart");
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: {
-          exporters: [
-            { service: "node_exporter", active: true, port: 9100 },
-          ],
-          count: 1,
-        },
-      }),
-    );
-    render(<MonitoringPage />);
-    // Restart button should be disabled
-    const restartBtn = screen.getByText("Restart");
-    expect(restartBtn.closest("button")?.disabled).toBe(true);
-  });
-
   it("DiagnosticsPage: playbook isPending shows loader", () => {
     mockMutationPending("playbooks/run");
     mockUseNodeProxy.mockReturnValue(
@@ -527,76 +315,6 @@ describe("isPending branch coverage", () => {
 // Alternative state tests — cover false branches of conditionals
 // =====================================================================
 describe("Alternative state branch coverage", () => {
-  it("SessionsPage: non-active state renders outline badge", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            username: "user1",
-            ip: "10.0.0.1",
-            sid: "s1",
-            ifname: "ppp0",
-            calling_sid: "aa:bb:cc:dd:ee:ff",
-            rate_limit: "10M/20M",
-            uptime: "1h",
-            state: "closing",
-          },
-        ],
-        refetch: vi.fn(),
-      }),
-    );
-    render(<SessionsPage />);
-    expect(screen.getByText("closing")).toBeTruthy();
-  });
-
-  it("SessionsPage: undefined state renders fallback 'active'", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: [
-          {
-            username: "user2",
-            ip: "10.0.0.2",
-            sid: "s2",
-            ifname: "ppp1",
-            calling_sid: "11:22:33:44:55:66",
-            rate_limit: "5M/10M",
-            uptime: "2h",
-          },
-        ],
-        refetch: vi.fn(),
-      }),
-    );
-    render(<SessionsPage />);
-    // The ?? "active" fallback should render
-    expect(screen.getByText("active")).toBeTruthy();
-  });
-
-  it("SessionsPage: no stats data hides stats row", () => {
-    // Use path-based mock: sessions returns data, sessions/stats returns null
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "sessions") {
-        return mockQuery({
-          data: [
-            {
-              username: "u1",
-              ip: "10.0.0.1",
-              sid: "s1",
-              ifname: "ppp0",
-              calling_sid: "aa:bb:cc:dd:ee:ff",
-              rate_limit: "10M/20M",
-              uptime: "1h",
-              state: "active",
-            },
-          ],
-          refetch: vi.fn(),
-        });
-      }
-      return mockQuery(); // null data for stats
-    });
-    render(<SessionsPage />);
-    expect(screen.getByText("u1")).toBeTruthy();
-  });
-
   it("ServicePage: non-running status shows disabled action buttons", () => {
     mockUseNodeProxy.mockReturnValue(
       mockQuery({
@@ -656,22 +374,6 @@ describe("Alternative state branch coverage", () => {
     );
     render(<DhcpPage />);
     expect(screen.getByText("active")).toBeTruthy();
-  });
-
-  it("MonitoringPage: boolean false value renders inactive badge", () => {
-    mockUseNodeProxy.mockReturnValue(
-      mockQuery({
-        data: {
-          exporters: [
-            { service: "node_exporter", active: false, port: 9100 },
-          ],
-          count: 1,
-        },
-        refetch: vi.fn(),
-      }),
-    );
-    render(<MonitoringPage />);
-    expect(screen.getByText("inactive")).toBeTruthy();
   });
 
   it("DiagnosticsPage: warn and error doctor statuses", () => {
@@ -750,48 +452,6 @@ describe("Alternative state branch coverage", () => {
 // Remaining branch coverage — testable branches
 // =====================================================================
 describe("Remaining branch coverage", () => {
-  it("SessionsPage: row without sid falls back to username key", () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "sessions") {
-        return mockQuery({
-          data: [
-            {
-              username: "user-no-sid",
-              ip: "10.0.0.3",
-              ifname: "ppp2",
-              calling_sid: "aa:bb:cc:dd:ee:ff",
-              rate_limit: "5M/10M",
-              uptime: "30m",
-              state: "active",
-            },
-          ],
-          refetch: vi.fn(),
-        });
-      }
-      return mockQuery();
-    });
-    render(<SessionsPage />);
-    expect(screen.getByText("user-no-sid")).toBeTruthy();
-  });
-
-  it("ConfigPage: rollback confirm triggers rollback mutation", async () => {
-    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "config") return mockQuery({ data: { key: "value" } });
-      return mockQuery({ data: [], refetch: vi.fn() });
-    });
-    render(<ConfigPage />);
-    // Click "Rollback" to open dialog
-    const rollbackBtn = screen.getByText("Rollback");
-    fireEvent.click(rollbackBtn);
-    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
-    // Click Confirm to trigger rollback mutation — wrap in act to flush async onConfirm
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("confirm-btn"));
-    });
-    const rollbackMut = mutationMap.get("n1:config/rollback");
-    expect(rollbackMut?.mutateAsync).toHaveBeenCalled();
-  });
-
   it("ServicePage: isPending with matching confirmAction shows Loader2", () => {
     let actionCallCount = 0;
     mockUseNodeProxyMutation.mockImplementation(

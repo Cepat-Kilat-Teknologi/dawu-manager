@@ -7,8 +7,8 @@ import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-t
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw } from "lucide-react";
-import { formatUptime } from "@/lib/utils";
+import { RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { cn, formatUptime } from "@/lib/utils";
 
 /** Live resource metrics from `system/metrics` (nested objects, polled). */
 interface Metrics {
@@ -100,6 +100,16 @@ function addressText(addr: unknown): string {
   return String(addr);
 }
 
+/**
+ * Render an NTP field value, dashing empty strings and missing values.
+ * When the clock is unsynced accel-ppp returns "" for most fields — nullish
+ * coalescing alone would leave those blank, so empty strings must dash too.
+ */
+function dashValue(value: string | number | undefined): string {
+  if (value === undefined || value === "") return "—";
+  return String(value);
+}
+
 interface GaugeProps {
   label: string;
   percent: number;
@@ -150,6 +160,7 @@ export default function SystemPage() {
   const mem = metrics.data?.memory;
   const disk = metrics.data?.disk;
   const loadAvg = cpu?.load_avg ?? [];
+  const ntpSynced = ntp.data?.synced ?? false;
 
   const identity = [
     { label: "Hostname", value: info.data?.hostname },
@@ -271,45 +282,87 @@ export default function SystemPage() {
           isLoading={ntp.isLoading}
           error={ntp.error}
           onRetry={() => ntp.refetch()}
-          actions={
-            <Badge variant={ntp.data?.synced ? "default" : "outline"}>
-              {ntp.data?.synced ? "Synced" : "Not synced"}
-            </Badge>
-          }
         >
-          <dl className="grid gap-2 text-sm">
-            {ntpFields.map((f) => (
-              <div
-                key={f.label}
-                className="flex justify-between gap-4 border-b py-1.5 last:border-0"
-              >
-                <dt className="text-muted-foreground">{f.label}</dt>
-                <dd className="font-mono text-xs">{f.value ?? "—"}</dd>
+          <div className="space-y-3">
+            {/* Prominent sync banner */}
+            <div
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg border px-3 py-2.5",
+                ntpSynced
+                  ? "border-success/30 bg-success/10"
+                  : "border-warning/30 bg-warning/10",
+              )}
+            >
+              {ntpSynced ? (
+                <CheckCircle2
+                  className="h-5 w-5 shrink-0 text-success"
+                  aria-hidden="true"
+                />
+              ) : (
+                <AlertTriangle
+                  className="h-5 w-5 shrink-0 text-warning"
+                  aria-hidden="true"
+                />
+              )}
+              <div>
+                <p
+                  className={cn(
+                    "text-sm font-semibold",
+                    ntpSynced ? "text-success" : "text-warning",
+                  )}
+                >
+                  {ntpSynced ? "Synced" : "Not synced"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {ntpSynced
+                    ? "System clock is synchronised with an NTP source."
+                    : "System clock is not synchronised with an NTP source."}
+                </p>
               </div>
-            ))}
-          </dl>
+            </div>
+
+            {/* Detail fields — empty values render dashed, never blank */}
+            <dl className="grid gap-2 text-sm">
+              {ntpFields.map((f) => (
+                <div
+                  key={f.label}
+                  className="flex justify-between gap-4 border-b py-1.5 last:border-0"
+                >
+                  <dt className="text-muted-foreground">{f.label}</dt>
+                  <dd className="font-mono text-xs">{dashValue(f.value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </NodePageShell>
 
         {/* LLDP neighbours */}
-        <NodePageShell
-          title={`LLDP Neighbors (${lldp.data?.length ?? 0})`}
-          isLoading={lldp.isLoading}
-          error={lldp.error}
-          onRetry={() => lldp.refetch()}
-          isEmpty={lldp.data?.length === 0}
-          emptyMessage="No LLDP neighbors discovered."
-          actions={
-            <Button variant="outline" size="sm" onClick={() => lldp.refetch()}>
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
-            </Button>
-          }
-        >
-          <ProxyDataTable
-            columns={lldpColumns}
-            data={lldp.data ?? []}
-            getRowKey={(r) => `${r.local_port}-${r.remote_system}`}
-          />
-        </NodePageShell>
+        <div className="space-y-2">
+          <NodePageShell
+            title={`LLDP Neighbors (${lldp.data?.length ?? 0})`}
+            isLoading={lldp.isLoading}
+            error={lldp.error}
+            onRetry={() => lldp.refetch()}
+            isEmpty={lldp.data?.length === 0}
+            emptyMessage="No LLDP neighbors discovered."
+            actions={
+              <Button variant="outline" size="sm" onClick={() => lldp.refetch()}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+              </Button>
+            }
+          >
+            <ProxyDataTable
+              columns={lldpColumns}
+              data={lldp.data ?? []}
+              getRowKey={(r) => `${r.local_port}-${r.remote_system}`}
+            />
+          </NodePageShell>
+          {lldp.data?.length === 0 && (
+            <p className="px-1 text-xs text-muted-foreground">
+              LLDP is active; no neighbours are advertising on connected links.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

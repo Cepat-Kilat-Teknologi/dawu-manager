@@ -48,6 +48,11 @@ interface NodePageShellProps {
   children: React.ReactNode;
   /** Optional action buttons rendered in the card header. */
   actions?: React.ReactNode;
+  /**
+   * Optional guidance shown under the calm "not available" note for a 404/405,
+   * e.g. how to enable the feature ("Start node_exporter to see metrics").
+   */
+  unavailableHint?: React.ReactNode;
 }
 
 /**
@@ -64,6 +69,7 @@ export function NodePageShell({
   emptyMessage = "No data available.",
   children,
   actions,
+  unavailableHint,
 }: NodePageShellProps) {
   if (isLoading) {
     return (
@@ -91,10 +97,17 @@ export function NodePageShell({
           <CardHeader>
             <CardTitle className="text-lg text-muted-foreground">{title}</CardTitle>
           </CardHeader>
-          <CardContent className="flex items-center gap-2 pb-6 text-sm text-muted-foreground">
-            <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
-            Not available on this node — this feature isn’t supported by the
-            dawos-agent here.
+          <CardContent className="pb-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Not available on this node — this feature isn’t supported by the
+              dawos-agent here.
+            </div>
+            {unavailableHint && (
+              <div className="mt-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+                {unavailableHint}
+              </div>
+            )}
           </CardContent>
         </Card>
       );
@@ -129,8 +142,11 @@ export function NodePageShell({
   if (isEmpty) {
     return (
       <Card className="rounded-xl border-border">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="font-heading text-lg">{title}</CardTitle>
+          {/* Keep actions (e.g. "Add") visible when empty — that's exactly
+              when the user needs to create the first item. */}
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
         </CardHeader>
         <CardContent className="flex items-center justify-center py-12">
           <p className="text-sm text-muted-foreground">{emptyMessage}</p>

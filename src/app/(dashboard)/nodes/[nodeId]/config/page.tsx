@@ -16,6 +16,7 @@ import {
   Loader2,
   Pencil,
   X,
+  FileCheck,
 } from "lucide-react";
 
 interface ConfigBackup {
@@ -29,6 +30,32 @@ interface ConfigData {
   path: string;
   content: string;
   last_modified: string;
+}
+
+/**
+ * Lightweight client-side sanity check for accel-ppp INI config.
+ * The agent has no validate endpoint; this catches obvious structural typos
+ * (malformed/empty section headers, no sections) before you apply. The real
+ * validation is the guarded apply — accel-ppp auto-rolls-back a bad config.
+ * @returns list of human-readable issues (empty = looks OK)
+ */
+export function checkConfigSyntax(text: string): string[] {
+  const issues: string[] = [];
+  const lines = text.split("\n");
+  let hasSection = false;
+  lines.forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line || line.startsWith("#") || line.startsWith(";")) return;
+    if (line.startsWith("[") || line.endsWith("]")) {
+      if (!/^\[[^[\]]+\]$/.test(line)) {
+        issues.push(`Line ${i + 1}: malformed section header "${line}"`);
+      } else {
+        hasSection = true;
+      }
+    }
+  });
+  if (!hasSection) issues.push("No [section] headers found.");
+  return issues;
 }
 
 /**
@@ -99,6 +126,26 @@ export default function ConfigPage() {
         actions={
           editing ? (
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const issues = checkConfigSyntax(draft);
+                  if (issues.length === 0) {
+                    toast.success("Syntax check passed", {
+                      description:
+                        "Structure looks valid. The guard timer still verifies the live apply.",
+                    });
+                  } else {
+                    toast.error(`${issues.length} issue(s) found`, {
+                      description: issues.slice(0, 3).join("; "),
+                    });
+                  }
+                }}
+                disabled={applyMutation.isPending}
+              >
+                <FileCheck className="mr-1.5 h-3.5 w-3.5" /> Check syntax
+              </Button>
               <Button
                 size="sm"
                 onClick={() => applyMutation.mutate({ content: draft })}
