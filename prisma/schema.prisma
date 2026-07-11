@@ -80,3 +80,40 @@ model Setting {
   key   String @id
   value String
 }
+
+// ---------------------------------------------------------------------------
+// Alerting — threshold rules + fired-event history
+// ---------------------------------------------------------------------------
+
+model AlertRule {
+  id         String       @id @default(cuid())
+  name       String
+  nodeId     String? // null = applies to every node
+  metric     String // node_offline | cpu_percent | mem_percent | disk_percent | session_count
+  operator   String       @default("gt") // gt | lt
+  threshold  Float        @default(0)
+  enabled    Boolean      @default(true)
+  webhookUrl String? // optional outbound webhook on breach
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  events     AlertEvent[]
+
+  @@index([enabled])
+}
+
+model AlertEvent {
+  id        String    @id @default(cuid())
+  ruleId    String
+  ruleName  String
+  nodeId    String?
+  nodeName  String?
+  metric    String
+  value     Float
+  threshold Float
+  message   String
+  createdAt DateTime  @default(now())
+  rule      AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@index([createdAt])
+}

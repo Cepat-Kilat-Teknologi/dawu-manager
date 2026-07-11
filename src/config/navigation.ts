@@ -17,6 +17,7 @@ import {
   MonitorCog,
   Route,
   Layers,
+  BellRing,
   type LucideIcon,
 } from "lucide-react";
 
@@ -47,6 +48,7 @@ export const mainNavItems: NavSection[] = [
   {
     title: "Management",
     items: [
+      { title: "Alerts", href: "/alerts", icon: BellRing, roles: ["operator", "admin"] },
       { title: "Users", href: "/users", icon: Users, roles: ["admin"] },
       { title: "Audit Log", href: "/audit", icon: FileText, roles: ["admin"] },
       { title: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
