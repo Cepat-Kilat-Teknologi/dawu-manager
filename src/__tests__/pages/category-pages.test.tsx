@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
+import { toast } from "sonner";
 import "@/__tests__/ui-mocks";
 
 // --- Shared mock setup ---
@@ -93,7 +94,9 @@ function mockQuery(overrides: Record<string, unknown> = {}) {
 
 // --- Page imports ---
 import ServicePage from "@/app/(dashboard)/nodes/[nodeId]/service/page";
-import DhcpPage from "@/app/(dashboard)/nodes/[nodeId]/dhcp/page";
+import DhcpPage, {
+  parseServers,
+} from "@/app/(dashboard)/nodes/[nodeId]/dhcp/page";
 import EventsPage from "@/app/(dashboard)/nodes/[nodeId]/events/page";
 import DiagnosticsPage from "@/app/(dashboard)/nodes/[nodeId]/diagnostics/page";
 
@@ -320,6 +323,185 @@ describe("DhcpPage", () => {
     });
     render(<DhcpPage />);
     expect(screen.getByText("No active DHCP leases.")).toBeTruthy();
+  });
+});
+
+// =====================================================================
+// parseServers helper
+// =====================================================================
+describe("parseServers", () => {
+  it("splits, trims, and deduplicates comma-separated servers", () => {
+    expect(parseServers("8.8.8.8, 1.1.1.1, 8.8.8.8")).toEqual([
+      "8.8.8.8",
+      "1.1.1.1",
+    ]);
+  });
+
+  it("returns empty array for blank input", () => {
+    expect(parseServers("")).toEqual([]);
+    expect(parseServers(" , , ")).toEqual([]);
+  });
+});
+
+// =====================================================================
+// DhcpPage — DNS Forwarding section
+// =====================================================================
+describe("DhcpPage DNS Forwarding", () => {
+  const fullDnsMock = (dnsData?: Record<string, unknown>) =>
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "dhcp/status") return mockQuery({ data: {} });
+      if (path === "dhcp/leases") return mockQuery({ data: [] });
+      if (path === "dhcp/relay") return mockQuery({ data: {} });
+      if (path === "dns/forwarding") {
+        return mockQuery({ data: dnsData ?? { servers: ["8.8.8.8"], cache_size: 10000 } });
+      }
+      return mockQuery();
+    });
+
+  it("renders DNS forwarding data as key-value pairs", () => {
+    fullDnsMock({ servers: ["8.8.8.8"], cache_size: 10000 });
+    render(<DhcpPage />);
+    expect(screen.getByText("DNS Forwarding")).toBeTruthy();
+    expect(screen.getByText("cache size")).toBeTruthy();
+  });
+
+  it("shows loading state for DNS forwarding", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "dns/forwarding") return mockQuery({ isLoading: true });
+      if (path === "dhcp/leases") return mockQuery({ data: [] });
+      return mockQuery({ data: {} });
+    });
+    render(<DhcpPage />);
+    expect(screen.getByText("DNS Forwarding")).toBeTruthy();
+  });
+
+  it("shows unavailable badge on DNS forwarding error", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "dns/forwarding")
+        return mockQuery({ error: new Error("not found") });
+      if (path === "dhcp/leases") return mockQuery({ data: [] });
+      return mockQuery({ data: {} });
+    });
+    render(<DhcpPage />);
+    expect(screen.getByText("unavailable")).toBeTruthy();
+  });
+
+  it("shows no-data message when dns/forwarding returns null", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "dns/forwarding") return mockQuery({ data: null });
+      if (path === "dhcp/leases") return mockQuery({ data: [] });
+      return mockQuery({ data: {} });
+    });
+    render(<DhcpPage />);
+    expect(screen.getByText("No DNS forwarding data.")).toBeTruthy();
+  });
+
+  it("updates DNS config with parsed servers and cache size", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    fireEvent.change(screen.getByLabelText("DNS Servers"), {
+      target: { value: "8.8.8.8, 1.1.1.1" },
+    });
+    fireEvent.change(screen.getByLabelText("Cache Size"), {
+      target: { value: "5000" },
+    });
+    fireEvent.click(screen.getByText("Update Config"));
+    const mutation = mutationMap.get("n1:dns/forwarding/config")!;
+    expect(mutation.mutate).toHaveBeenCalledWith({
+      servers: ["8.8.8.8", "1.1.1.1"],
+      cache_size: 5000,
+    });
+  });
+
+  it("shows error toast when no servers provided", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    fireEvent.change(screen.getByLabelText("Cache Size"), {
+      target: { value: "5000" },
+    });
+    fireEvent.click(screen.getByText("Update Config"));
+    expect(toast.error).toHaveBeenCalledWith("Enter at least one DNS server");
+  });
+
+  it("shows error toast when cache size is invalid", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    fireEvent.change(screen.getByLabelText("DNS Servers"), {
+      target: { value: "8.8.8.8" },
+    });
+    fireEvent.click(screen.getByText("Update Config"));
+    expect(toast.error).toHaveBeenCalledWith(
+      "Cache size must be a non-negative integer",
+    );
+  });
+
+  it("shows error toast when cache size is negative", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    fireEvent.change(screen.getByLabelText("DNS Servers"), {
+      target: { value: "8.8.8.8" },
+    });
+    fireEvent.change(screen.getByLabelText("Cache Size"), {
+      target: { value: "-1" },
+    });
+    fireEvent.click(screen.getByText("Update Config"));
+    expect(toast.error).toHaveBeenCalledWith(
+      "Cache size must be a non-negative integer",
+    );
+  });
+
+  it("flushes DNS cache", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    fireEvent.click(screen.getByText("Flush Cache"));
+    expect(
+      mutationMap.get("n1:dns/forwarding/flush")!.mutate,
+    ).toHaveBeenCalledWith({});
+  });
+
+  it("calls onSuccess for DNS config update and flush", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    mutationMap.get("n1:dns/forwarding/config")!.onSuccess!();
+    mutationMap.get("n1:dns/forwarding/flush")!.onSuccess!();
+    expect(toast.success).toHaveBeenCalledWith(
+      "DNS forwarding config updated",
+    );
+    expect(toast.success).toHaveBeenCalledWith("DNS cache flushed");
+  });
+
+  it("renders the info note about DNS configuration", () => {
+    fullDnsMock();
+    render(<DhcpPage />);
+    expect(
+      screen.getByText(
+        "Update the DNS forwarding configuration. Servers are comma-separated IP addresses.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("disables buttons and shows spinners while DNS mutations are pending", () => {
+    // Pre-populate pending mutations before render
+    mutationMap.set("n1:dns/forwarding/config", {
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: true,
+      onSuccess: undefined,
+    });
+    mutationMap.set("n1:dns/forwarding/flush", {
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: true,
+      onSuccess: undefined,
+    });
+    fullDnsMock();
+    render(<DhcpPage />);
+    expect(
+      screen.getByText("Update Config").closest("button")?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Flush Cache").closest("button")?.disabled,
+    ).toBe(true);
   });
 });
 
