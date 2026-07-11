@@ -69,6 +69,20 @@ export default function DiagnosticsPage() {
   const [deleteJobName, setDeleteJobName] = useState("");
   const [runJobName, setRunJobName] = useState("");
 
+  // Zone form state (Group 5)
+  const [zoneName, setZoneName] = useState("");
+  const [zoneInterfaces, setZoneInterfaces] = useState("");
+  const [deleteZoneName, setDeleteZoneName] = useState("");
+
+  // VRRP state (Group 6)
+  const [failoverGroup, setFailoverGroup] = useState("");
+  const [confirmFailover, setConfirmFailover] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState(false);
+
+  // Limits form state (Group 7)
+  const [maxSessions, setMaxSessions] = useState("");
+  const [maxStarting, setMaxStarting] = useState("");
+
   // Doctor checks
   const doctor = useNodeProxy<DoctorCheck[]>(nodeId, "diagnostics/doctor", { extract: "checks" });
 
@@ -124,6 +138,71 @@ export default function DiagnosticsPage() {
     },
   );
 
+  // Zone mutations (Group 5)
+  const createZoneMutation = useNodeProxyMutation<{
+    name: string;
+    interfaces: string[];
+  }>(nodeId, "zones", {
+    invalidates: ["zones"],
+    onSuccess: () => {
+      toast.success("Zone created");
+      setZoneName("");
+      setZoneInterfaces("");
+    },
+  });
+
+  const deleteZoneMutation = useNodeProxyMutation(
+    nodeId,
+    `zones/${encodeURIComponent(deleteZoneName || "_")}`,
+    {
+      method: "DELETE",
+      invalidates: ["zones"],
+      onSuccess: () => {
+        toast.success("Zone deleted");
+        setDeleteZoneName("");
+      },
+    },
+  );
+
+  // VRRP mutations (Group 6)
+  const failoverMutation = useNodeProxyMutation<{ group: string }>(
+    nodeId,
+    "vrrp/failover",
+    {
+      invalidates: ["vrrp"],
+      onSuccess: () => {
+        toast.success("VRRP failover initiated");
+        setConfirmFailover(false);
+      },
+    },
+  );
+
+  const restartVrrpMutation = useNodeProxyMutation(
+    nodeId,
+    "vrrp/restart",
+    {
+      invalidates: ["vrrp"],
+      onSuccess: () => {
+        toast.success("VRRP service restarted");
+        setConfirmRestart(false);
+      },
+    },
+  );
+
+  // Limits mutation (Group 7)
+  const updateLimitsMutation = useNodeProxyMutation<{
+    max_sessions?: number;
+    max_starting?: number;
+  }>(nodeId, "limits", {
+    method: "PUT",
+    invalidates: ["limits"],
+    onSuccess: () => {
+      toast.success("Limits updated");
+      setMaxSessions("");
+      setMaxStarting("");
+    },
+  });
+
   function handleCreateJob() {
     const name = jobName.trim();
     const command = jobCommand.trim();
@@ -148,11 +227,45 @@ export default function DiagnosticsPage() {
     });
   }
 
+  function handleCreateZone() {
+    const name = zoneName.trim();
+    if (!name) {
+      toast.error("Zone name is required");
+      return;
+    }
+    const ifaces = zoneInterfaces
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    createZoneMutation.mutate({ name, interfaces: ifaces });
+  }
+
+  function handleUpdateLimits() {
+    const sessions = maxSessions.trim() ? parseInt(maxSessions, 10) : undefined;
+    const starting = maxStarting.trim() ? parseInt(maxStarting, 10) : undefined;
+    if (sessions === undefined && starting === undefined) {
+      toast.error("Provide at least one limit value");
+      return;
+    }
+    if (sessions !== undefined && (isNaN(sessions) || sessions < 1)) {
+      toast.error("Max sessions must be a positive integer");
+      return;
+    }
+    if (starting !== undefined && (isNaN(starting) || starting < 1)) {
+      toast.error("Max starting must be a positive integer");
+      return;
+    }
+    const body: { max_sessions?: number; max_starting?: number } = {};
+    if (sessions !== undefined) body.max_sessions = sessions;
+    if (starting !== undefined) body.max_starting = starting;
+    updateLimitsMutation.mutate(body);
+  }
+
   // Scheduler
   const scheduler = useNodeProxy<SchedulerJob[]>(nodeId, "scheduler/jobs", { extract: "jobs" });
 
-  // Zones
-  const zones = useNodeProxy<Zone[]>(nodeId, "firewall/zones", { extract: "zones" });
+  // Zones — dawos-agent serves zones at /api/v1/zones (NOT firewall/zones)
+  const zones = useNodeProxy<Zone[]>(nodeId, "zones", { extract: "zones" });
 
   // VRRP
   const vrrp = useNodeProxy<Record<string, unknown>>(nodeId, "vrrp/status");
@@ -264,6 +377,18 @@ export default function DiagnosticsPage() {
       ),
     },
     { header: "Policy", accessorKey: "policy" },
+    {
+      header: "Action",
+      cell: (row) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setDeleteZoneName(String(row.name ?? ""))}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      ),
+    },
   ];
 
   const conntrackColumns: ProxyColumn<ConntrackEntry>[] = [
@@ -383,12 +508,138 @@ export default function DiagnosticsPage() {
         </CardContent>
       </Card>
 
-      {/* VRRP + DNS + Limits + Bulk */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* VRRP (Group 6) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">VRRP</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {vrrp.isLoading ? (
+            <div className="animate-pulse h-6 w-20 rounded bg-muted" />
+          ) : vrrp.error ? (
+            <Badge variant="outline">unavailable</Badge>
+          ) : vrrp.data ? (
+            <dl className="grid gap-1 text-xs">
+              {Object.entries(vrrp.data)
+                .slice(0, 4)
+                .map(([k, v]) => (
+                  <div key={k} className="flex justify-between">
+                    <dt className="text-muted-foreground">{k.replace(/_/g, " ")}</dt>
+                    <dd className="font-mono">{formatValue(v)}</dd>
+                  </div>
+                ))}
+            </dl>
+          ) : (
+            <span className="text-xs text-muted-foreground">No data</span>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="failover-group">VRRP Group</Label>
+              <Input
+                id="failover-group"
+                placeholder="group1"
+                value={failoverGroup}
+                onChange={(e) => setFailoverGroup(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={failoverMutation.isPending}
+              onClick={() => {
+                if (!failoverGroup.trim()) {
+                  toast.error("VRRP group is required");
+                  return;
+                }
+                setConfirmFailover(true);
+              }}
+            >
+              {failoverMutation.isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Failover
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={restartVrrpMutation.isPending}
+              onClick={() => setConfirmRestart(true)}
+            >
+              {restartVrrpMutation.isPending && (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              )}
+              Restart VRRP
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Limits (Group 7) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Session Limits</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {limits.isLoading ? (
+            <div className="animate-pulse h-6 w-20 rounded bg-muted" />
+          ) : limits.error ? (
+            <Badge variant="outline">unavailable</Badge>
+          ) : limits.data ? (
+            <dl className="grid gap-1 text-xs">
+              {Object.entries(limits.data)
+                .slice(0, 4)
+                .map(([k, v]) => (
+                  <div key={k} className="flex justify-between">
+                    <dt className="text-muted-foreground">{k.replace(/_/g, " ")}</dt>
+                    <dd className="font-mono">{formatValue(v)}</dd>
+                  </div>
+                ))}
+            </dl>
+          ) : (
+            <span className="text-xs text-muted-foreground">No data</span>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="max-sessions">Max Sessions</Label>
+              <Input
+                id="max-sessions"
+                type="number"
+                min={1}
+                placeholder="10000"
+                value={maxSessions}
+                onChange={(e) => setMaxSessions(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="max-starting">Max Starting</Label>
+              <Input
+                id="max-starting"
+                type="number"
+                min={1}
+                placeholder="100"
+                value={maxStarting}
+                onChange={(e) => setMaxStarting(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleUpdateLimits}
+            disabled={updateLimitsMutation.isPending}
+          >
+            {updateLimitsMutation.isPending && (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            )}
+            Update Limits
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* DNS + Bulk status cards */}
+      <div className="grid gap-6 sm:grid-cols-2">
         {[
-          { title: "VRRP", query: vrrp },
           { title: "DNS Forwarding", query: dns },
-          { title: "Limits", query: limits },
           { title: "Bulk Operations", query: bulk },
         ].map(({ title, query }) => (
           <Card key={title}>
@@ -430,6 +681,46 @@ export default function DiagnosticsPage() {
       >
         <ProxyDataTable columns={zoneColumns} data={zones.data ?? []} getRowKey={(r) => r.name} />
       </NodePageShell>
+
+      {/* Create Zone (Group 5) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Create Zone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="zone-name">Zone Name</Label>
+              <Input
+                id="zone-name"
+                placeholder="dmz"
+                value={zoneName}
+                onChange={(e) => setZoneName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="zone-interfaces">Interfaces (comma-separated)</Label>
+              <Input
+                id="zone-interfaces"
+                placeholder="eth0, eth1"
+                className="font-mono"
+                value={zoneInterfaces}
+                onChange={(e) => setZoneInterfaces(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleCreateZone}
+            disabled={createZoneMutation.isPending}
+          >
+            {createZoneMutation.isPending && (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            )}
+            Create Zone
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Conntrack */}
       <NodePageShell
@@ -494,6 +785,37 @@ export default function DiagnosticsPage() {
         description={`Execute scheduler job "${runJobName}" immediately? This triggers the job outside its regular schedule.`}
         confirmLabel="Run"
         onConfirm={() => runJobMutation.mutate({})}
+      />
+
+      {/* Zone ConfirmDialog (Group 5) */}
+      <ConfirmDialog
+        open={!!deleteZoneName}
+        onOpenChange={() => setDeleteZoneName("")}
+        title="Delete Zone"
+        description={`Permanently delete firewall zone "${deleteZoneName}"? All zone rules and interface bindings will be removed.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => deleteZoneMutation.mutate({})}
+      />
+
+      {/* VRRP ConfirmDialogs (Group 6) */}
+      <ConfirmDialog
+        open={confirmFailover}
+        onOpenChange={() => setConfirmFailover(false)}
+        title="VRRP Failover"
+        description={`Initiate VRRP failover for group "${failoverGroup}"? This forces a master transition and may briefly interrupt traffic.`}
+        confirmLabel="Failover"
+        variant="destructive"
+        onConfirm={() => failoverMutation.mutate({ group: failoverGroup.trim() })}
+      />
+      <ConfirmDialog
+        open={confirmRestart}
+        onOpenChange={() => setConfirmRestart(false)}
+        title="Restart VRRP"
+        description="Restart the VRRP service? All VRRP groups will re-negotiate master/backup roles, causing brief traffic interruption."
+        confirmLabel="Restart"
+        variant="destructive"
+        onConfirm={() => restartVrrpMutation.mutate({})}
       />
     </div>
   );

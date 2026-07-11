@@ -410,7 +410,7 @@ describe("Alternative state branch coverage", () => {
 
   it("DiagnosticsPage: zone with no interfaces", () => {
     mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
-      if (path === "firewall/zones") return mockQuery({ data: [{ name: "dmz", policy: "drop" }], refetch: vi.fn() });
+      if (path === "zones") return mockQuery({ data: [{ name: "dmz", policy: "drop" }], refetch: vi.fn() });
       return mockQuery({ data: [], refetch: vi.fn() });
     });
     render(<DiagnosticsPage />);

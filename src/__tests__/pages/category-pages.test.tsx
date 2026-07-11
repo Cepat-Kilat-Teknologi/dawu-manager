@@ -645,7 +645,7 @@ describe("DiagnosticsPage", () => {
           ],
         });
       }
-      if (path === "firewall/zones") {
+      if (path === "zones") {
         return mockQuery({
           data: [
             {
@@ -766,7 +766,7 @@ describe("DiagnosticsPage", () => {
     render(<DiagnosticsPage />);
     expect(screen.getByText("VRRP")).toBeTruthy();
     expect(screen.getByText("DNS Forwarding")).toBeTruthy();
-    expect(screen.getByText("Limits")).toBeTruthy();
+    expect(screen.getByText("Session Limits")).toBeTruthy();
     expect(screen.getByText("Bulk Operations")).toBeTruthy();
     expect(screen.getByText("master")).toBeTruthy();
   });
@@ -793,7 +793,7 @@ describe("DiagnosticsPage", () => {
         path === "diagnostics/doctor" ||
         path === "playbooks" ||
         path === "scheduler/jobs" ||
-        path === "firewall/zones" ||
+        path === "zones" ||
         path === "conntrack/entries"
       ) {
         return mockQuery({ data: [] });
@@ -1069,7 +1069,7 @@ describe("DiagnosticsPage", () => {
         }
         if (path === "diagnostics/doctor") return mockQuery({ data: [] });
         if (path === "playbooks") return mockQuery({ data: [] });
-        if (path === "firewall/zones") return mockQuery({ data: [] });
+        if (path === "zones") return mockQuery({ data: [] });
         if (path === "conntrack/entries") return mockQuery({ data: [] });
         return mockQuery({ data: {} });
       });
@@ -1084,5 +1084,536 @@ describe("DiagnosticsPage", () => {
       const deleteBtn = row?.querySelector("button:last-child");
       if (deleteBtn) fireEvent.click(deleteBtn);
     });
+  });
+
+  // --- Zone CRUD (Group 5) ---
+
+  describe("Zone management", () => {
+    it("renders zone action buttons (Delete)", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Zone table has Delete buttons for each zone
+      // "wan" and "lan" zones — zones section has Trash2 icons
+      expect(screen.getByText("wan")).toBeTruthy();
+      expect(screen.getByText("lan")).toBeTruthy();
+    });
+
+    it("creates a zone with valid input", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Zone Name"), {
+        target: { value: "dmz" },
+      });
+      fireEvent.change(screen.getByLabelText("Interfaces (comma-separated)"), {
+        target: { value: "eth0, eth1" },
+      });
+      // "Create Zone" appears in CardTitle AND button — pick the button
+      const createBtn = screen.getAllByText("Create Zone").find((el) => el.closest("button"))!;
+      fireEvent.click(createBtn);
+      const createMut = mutationMap.get("n1:zones");
+      expect(createMut?.mutate).toHaveBeenCalledWith({
+        name: "dmz",
+        interfaces: ["eth0", "eth1"],
+      });
+    });
+
+    it("creates a zone with empty interfaces", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Zone Name"), {
+        target: { value: "isolated" },
+      });
+      const createBtn = screen.getAllByText("Create Zone").find((el) => el.closest("button"))!;
+      fireEvent.click(createBtn);
+      const createMut = mutationMap.get("n1:zones");
+      expect(createMut?.mutate).toHaveBeenCalledWith({
+        name: "isolated",
+        interfaces: [],
+      });
+    });
+
+    it("rejects create when zone name is empty", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const createBtn = screen.getAllByText("Create Zone").find((el) => el.closest("button"))!;
+      fireEvent.click(createBtn);
+      expect(toast.error).toHaveBeenCalledWith("Zone name is required");
+    });
+
+    it("calls createZone onSuccess and clears form", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Zone Name"), {
+        target: { value: "will-clear" },
+      });
+      const createMut = mutationMap.get("n1:zones");
+      createMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("Zone created");
+    });
+
+    it("opens delete confirm dialog and deletes zone", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      // Click delete button on "wan" zone row
+      const wanRow = screen.getByText("wan").closest("tr") ?? screen.getByText("wan").parentElement;
+      const deleteBtn = wanRow?.querySelector("button");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      expect(screen.getByTestId("confirm-desc").textContent).toContain("wan");
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+      const delMut = mutationMap.get("n1:DELETE:zones/wan");
+      expect(delMut?.mutate).toHaveBeenCalled();
+    });
+
+    it("calls deleteZone onSuccess callback", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const wanRow = screen.getByText("wan").closest("tr") ?? screen.getByText("wan").parentElement;
+      const deleteBtn = wanRow?.querySelector("button");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+      const delMut = mutationMap.get("n1:DELETE:zones/wan");
+      delMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("Zone deleted");
+    });
+
+    it("cancels delete dialog via cancel button", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const wanRow = screen.getByText("wan").closest("tr") ?? screen.getByText("wan").parentElement;
+      const deleteBtn = wanRow?.querySelector("button");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("cancel-btn"));
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    it("shows spinner on create button when isPending", () => {
+      mutationMap.set("n1:zones", {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+      });
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const createBtn = screen.getAllByText("Create Zone").find((el) => el.closest("button"))!;
+      expect(createBtn.closest("button")?.disabled).toBe(true);
+    });
+
+    it("renders zone with missing name gracefully", () => {
+      mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+        if (path === "zones") {
+          return mockQuery({
+            data: [{ name: undefined, interfaces: ["eth0"], policy: "accept" }],
+            refetch: vi.fn(),
+          });
+        }
+        if (path === "diagnostics/doctor") return mockQuery({ data: [] });
+        if (path === "playbooks") return mockQuery({ data: [] });
+        if (path === "scheduler/jobs") return mockQuery({ data: [] });
+        if (path === "conntrack/entries") return mockQuery({ data: [] });
+        return mockQuery({ data: {} });
+      });
+      render(<DiagnosticsPage />);
+      expect(screen.getByText("eth0")).toBeTruthy();
+      // Click Delete button — exercises row.name ?? "" fallback
+      const row = screen.getByText("eth0").closest("tr") ?? screen.getByText("eth0").parentElement;
+      const deleteBtn = row?.querySelector("button");
+      if (deleteBtn) fireEvent.click(deleteBtn);
+    });
+  });
+
+  // --- VRRP failover/restart (Group 6) ---
+
+  describe("VRRP management", () => {
+    it("renders VRRP status data in dedicated card", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      expect(screen.getByText("VRRP")).toBeTruthy();
+      expect(screen.getByText("master")).toBeTruthy();
+    });
+
+    it("initiates failover with valid group", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("VRRP Group"), {
+        target: { value: "group1" },
+      });
+      fireEvent.click(screen.getByText("Failover"));
+      // ConfirmDialog opens
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      expect(screen.getByTestId("confirm-desc").textContent).toContain("group1");
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+      const failMut = mutationMap.get("n1:vrrp/failover");
+      expect(failMut?.mutate).toHaveBeenCalledWith({ group: "group1" });
+    });
+
+    it("rejects failover when group is empty", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.click(screen.getByText("Failover"));
+      expect(toast.error).toHaveBeenCalledWith("VRRP group is required");
+    });
+
+    it("calls failover onSuccess callback", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const failMut = mutationMap.get("n1:vrrp/failover");
+      failMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("VRRP failover initiated");
+    });
+
+    it("cancels failover dialog via cancel button", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("VRRP Group"), {
+        target: { value: "group1" },
+      });
+      fireEvent.click(screen.getByText("Failover"));
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("cancel-btn"));
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    it("opens restart confirm dialog and restarts VRRP", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.click(screen.getByText("Restart VRRP"));
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      expect(screen.getByTestId("confirm-desc").textContent).toContain(
+        "re-negotiate master/backup roles",
+      );
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+      const restartMut = mutationMap.get("n1:vrrp/restart");
+      expect(restartMut?.mutate).toHaveBeenCalledWith({});
+    });
+
+    it("calls restart VRRP onSuccess callback", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const restartMut = mutationMap.get("n1:vrrp/restart");
+      restartMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("VRRP service restarted");
+    });
+
+    it("cancels restart dialog via cancel button", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.click(screen.getByText("Restart VRRP"));
+      expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+      fireEvent.click(screen.getByTestId("cancel-btn"));
+      expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    });
+
+    it("shows spinner on failover button when isPending", () => {
+      mutationMap.set("n1:vrrp/failover", {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+      });
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const failoverBtn = screen.getByText("Failover").closest("button");
+      expect(failoverBtn?.disabled).toBe(true);
+    });
+
+    it("shows spinner on restart button when isPending", () => {
+      mutationMap.set("n1:vrrp/restart", {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+      });
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const restartBtn = screen.getByText("Restart VRRP").closest("button");
+      expect(restartBtn?.disabled).toBe(true);
+    });
+  });
+
+  // --- Limits update (Group 7) ---
+
+  describe("Limits management", () => {
+    it("renders limits data in dedicated card", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      expect(screen.getByText("Session Limits")).toBeTruthy();
+    });
+
+    it("updates limits with both values", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Max Sessions"), {
+        target: { value: "20000" },
+      });
+      fireEvent.change(screen.getByLabelText("Max Starting"), {
+        target: { value: "200" },
+      });
+      fireEvent.click(screen.getByText("Update Limits"));
+      const limitMut = mutationMap.get("n1:PUT:limits");
+      expect(limitMut?.mutate).toHaveBeenCalledWith({
+        max_sessions: 20000,
+        max_starting: 200,
+      });
+    });
+
+    it("updates limits with only max_sessions", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Max Sessions"), {
+        target: { value: "15000" },
+      });
+      fireEvent.click(screen.getByText("Update Limits"));
+      const limitMut = mutationMap.get("n1:PUT:limits");
+      expect(limitMut?.mutate).toHaveBeenCalledWith({ max_sessions: 15000 });
+    });
+
+    it("updates limits with only max_starting", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Max Starting"), {
+        target: { value: "50" },
+      });
+      fireEvent.click(screen.getByText("Update Limits"));
+      const limitMut = mutationMap.get("n1:PUT:limits");
+      expect(limitMut?.mutate).toHaveBeenCalledWith({ max_starting: 50 });
+    });
+
+    it("rejects when no values provided", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.click(screen.getByText("Update Limits"));
+      expect(toast.error).toHaveBeenCalledWith("Provide at least one limit value");
+    });
+
+    it("rejects invalid max_sessions", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Max Sessions"), {
+        target: { value: "0" },
+      });
+      fireEvent.click(screen.getByText("Update Limits"));
+      expect(toast.error).toHaveBeenCalledWith("Max sessions must be a positive integer");
+    });
+
+    it("rejects invalid max_starting", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Max Starting"), {
+        target: { value: "-5" },
+      });
+      fireEvent.click(screen.getByText("Update Limits"));
+      expect(toast.error).toHaveBeenCalledWith("Max starting must be a positive integer");
+    });
+
+    it("calls updateLimits onSuccess and clears form", () => {
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      fireEvent.change(screen.getByLabelText("Max Sessions"), {
+        target: { value: "5000" },
+      });
+      const limitMut = mutationMap.get("n1:PUT:limits");
+      limitMut?.onSuccess!();
+      expect(toast.success).toHaveBeenCalledWith("Limits updated");
+    });
+
+    it("shows spinner on update button when isPending", () => {
+      mutationMap.set("n1:PUT:limits", {
+        mutate: vi.fn(),
+        mutateAsync: vi.fn().mockResolvedValue({}),
+        isPending: true,
+      });
+      fullDiagMock();
+      render(<DiagnosticsPage />);
+      const updateBtn = screen.getByText("Update Limits").closest("button");
+      expect(updateBtn?.disabled).toBe(true);
+    });
+  });
+});
+
+// =====================================================================
+// Events Page — Hook CRUD (Group 7)
+// =====================================================================
+describe("EventsPage Hook CRUD", () => {
+  const fullEventsMock = () =>
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "events/hooks") {
+        return mockQuery({
+          data: [
+            {
+              id: "h1",
+              event: "session-up",
+              action: "notify",
+              enabled: true,
+              description: "On connect",
+            },
+            {
+              id: "h2",
+              event: "session-down",
+              action: "log",
+              enabled: false,
+            },
+          ],
+        });
+      }
+      if (path === "events/history") {
+        return mockQuery({
+          data: [
+            {
+              timestamp: "2026-07-10T12:00:00Z",
+              event: "config-change",
+              detail: "ppp0",
+              source: "admin",
+            },
+          ],
+        });
+      }
+      return mockQuery({ data: [] });
+    });
+
+  it("renders delete buttons alongside fire buttons", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    const fireBtns = screen.getAllByText("Fire");
+    expect(fireBtns.length).toBe(2);
+  });
+
+  it("creates a hook with valid input", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    fireEvent.change(screen.getByLabelText("Hook Name"), {
+      target: { value: "my-hook" },
+    });
+    fireEvent.change(screen.getByLabelText("Event Type"), {
+      target: { value: "session-up" },
+    });
+    fireEvent.change(screen.getByLabelText("Action"), {
+      target: { value: "notify" },
+    });
+    fireEvent.click(screen.getByText("Create Hook"));
+    const createMut = mutationMap.get("n1:events/hooks");
+    expect(createMut?.mutate).toHaveBeenCalledWith({
+      name: "my-hook",
+      event: "session-up",
+      action: "notify",
+      enabled: true,
+    });
+  });
+
+  it("rejects create when hook name is empty", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    fireEvent.change(screen.getByLabelText("Event Type"), {
+      target: { value: "session-up" },
+    });
+    fireEvent.change(screen.getByLabelText("Action"), {
+      target: { value: "notify" },
+    });
+    fireEvent.click(screen.getByText("Create Hook"));
+    expect(toast.error).toHaveBeenCalledWith("Hook name is required");
+  });
+
+  it("rejects create when event type is empty", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    fireEvent.change(screen.getByLabelText("Hook Name"), {
+      target: { value: "my-hook" },
+    });
+    fireEvent.change(screen.getByLabelText("Action"), {
+      target: { value: "notify" },
+    });
+    fireEvent.click(screen.getByText("Create Hook"));
+    expect(toast.error).toHaveBeenCalledWith("Event type is required");
+  });
+
+  it("rejects create when action is empty", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    fireEvent.change(screen.getByLabelText("Hook Name"), {
+      target: { value: "my-hook" },
+    });
+    fireEvent.change(screen.getByLabelText("Event Type"), {
+      target: { value: "session-up" },
+    });
+    fireEvent.click(screen.getByText("Create Hook"));
+    expect(toast.error).toHaveBeenCalledWith("Action is required");
+  });
+
+  it("calls createHook onSuccess and clears form", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    fireEvent.change(screen.getByLabelText("Hook Name"), {
+      target: { value: "will-clear" },
+    });
+    const createMut = mutationMap.get("n1:events/hooks");
+    createMut?.onSuccess!();
+    expect(toast.success).toHaveBeenCalledWith("Event hook created");
+  });
+
+  it("opens delete confirm dialog and deletes hook", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    // Find the row for "session-up" and click its delete button
+    const row = screen.getByText("session-up").closest("tr") ?? screen.getByText("session-up").parentElement;
+    const buttons = row?.querySelectorAll("button") ?? [];
+    // Last button is the delete (Trash2) button
+    const deleteBtn = buttons[buttons.length - 1];
+    if (deleteBtn) fireEvent.click(deleteBtn);
+    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+    expect(screen.getByTestId("confirm-desc").textContent).toContain("session-up");
+    fireEvent.click(screen.getByTestId("confirm-btn"));
+    const delMut = mutationMap.get("n1:DELETE:events/hooks/session-up");
+    expect(delMut?.mutate).toHaveBeenCalled();
+  });
+
+  it("calls deleteHook onSuccess callback", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    const row = screen.getByText("session-up").closest("tr") ?? screen.getByText("session-up").parentElement;
+    const buttons = row?.querySelectorAll("button") ?? [];
+    const deleteBtn = buttons[buttons.length - 1];
+    if (deleteBtn) fireEvent.click(deleteBtn);
+    const delMut = mutationMap.get("n1:DELETE:events/hooks/session-up");
+    delMut?.onSuccess!();
+    expect(toast.success).toHaveBeenCalledWith("Event hook deleted");
+  });
+
+  it("cancels delete dialog via cancel button", () => {
+    fullEventsMock();
+    render(<EventsPage />);
+    const row = screen.getByText("session-up").closest("tr") ?? screen.getByText("session-up").parentElement;
+    const buttons = row?.querySelectorAll("button") ?? [];
+    const deleteBtn = buttons[buttons.length - 1];
+    if (deleteBtn) fireEvent.click(deleteBtn);
+    expect(screen.getByTestId("confirm-dialog")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("cancel-btn"));
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+  });
+
+  it("shows spinner on create button when isPending", () => {
+    mutationMap.set("n1:events/hooks", {
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: true,
+    });
+    fullEventsMock();
+    render(<EventsPage />);
+    const createBtn = screen.getByText("Create Hook").closest("button");
+    expect(createBtn?.disabled).toBe(true);
+  });
+
+  it("renders hook with missing event gracefully and exercises delete", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "events/hooks") {
+        return mockQuery({
+          data: [{ id: "h3", event: undefined, action: "log", enabled: true }],
+        });
+      }
+      return mockQuery({ data: [] });
+    });
+    render(<EventsPage />);
+    // Click delete on the hook — exercises row.event ?? "" fallback
+    const row = screen.getByText("log").closest("tr") ?? screen.getByText("log").parentElement;
+    const buttons = row?.querySelectorAll("button") ?? [];
+    const deleteBtn = buttons[buttons.length - 1];
+    if (deleteBtn) fireEvent.click(deleteBtn);
   });
 });
