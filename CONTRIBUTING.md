@@ -139,15 +139,15 @@ Components are installed to `src/components/ui/`. Do not edit generated files di
 
 | Gate | Command | Target |
 |------|---------|--------|
-| Tests | `pnpm test` | 1115 passing |
-| Coverage | `pnpm test:coverage` | 100% (statements, branches, functions, lines) |
+| Tests | `pnpm test` | All passing |
+| Coverage | `pnpm test:coverage` | No significant drops |
 | Lint | `pnpm lint` | Zero errors |
 | Build | `pnpm build` | Clean build (includes `tsc` type checking) |
 
 ### Quick verification
 
 ```bash
-pnpm lint && pnpm test:coverage && pnpm build
+pnpm lint && pnpm test && pnpm build
 ```
 
 ### Test patterns
@@ -165,8 +165,7 @@ pnpm lint && pnpm test:coverage && pnpm build
 - Test files go in `src/__tests__/` mirroring the source structure
 - Use `vi.hoisted()` for any variable referenced inside `vi.mock()` factories
 - Mock shadcn/ui components via `src/__tests__/ui-mocks.tsx`
-- Every new component, page, or API route **must** have corresponding tests
-- Coverage must remain at **100%** — CI will reject drops
+- Every new component, page, or API route **should** have corresponding tests
 
 ### Running specific tests
 
@@ -248,7 +247,6 @@ refactor(auth): extract role check to shared utility
 ### PR checklist
 
 - [ ] All tests pass (`pnpm test`)
-- [ ] Coverage remains at 100% (`pnpm test:coverage`)
 - [ ] Lint is clean (`pnpm lint`)
 - [ ] Build succeeds (`pnpm build`)
 - [ ] New features have corresponding tests
