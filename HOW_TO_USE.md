@@ -34,20 +34,13 @@ docker compose up -d
 Open http://localhost:3789 in your browser. On first launch, you'll be redirected to the setup page.
 
 Fill in the admin account details:
+Fill in your admin account details:
 
-| Field    | Default Value      |
-|----------|--------------------|
-| Name     | admin              |
-| Email    | admin@dawu.local   |
-| Password | dawu               |
+- **Name** — your display name
+- **Email** — used for login
+- **Password** — choose a strong password (minimum 4 characters)
 
-Click **Create Account**. You'll be redirected to the login page.
-
-### 3. Log in
-
-Sign in with the credentials you just created.
-
-> **Security:** Change the default password after first login.
+> **Note:** The first account is always assigned the `admin` role. You can create additional users with different roles after login.
 
 ---
 

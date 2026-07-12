@@ -166,31 +166,10 @@ When dawu-manager starts with an empty database, you'll be redirected to the set
 Navigate to http://localhost:3789 — you'll be redirected to `/setup` automatically.
 
 ### 2. Create the admin account
+Fill in your admin account details — choose a name, email, and strong password.
+There are no hardcoded defaults; you set your own credentials.
 
-| Field    | Default Value      |
-|----------|--------------------|
-| Name     | admin              |
-| Email    | admin@dawu.local   |
-| Password | dawu               |
-
-You can use the defaults or enter your own values.
-
-### 3. Log in
-
-After setup, you'll be redirected to the login page. Sign in with the credentials you just created.
-
-### 4. Add your first BNG node
-
-Navigate to **Nodes** > **Add Node** and provide:
-
-| Field    | Example                        | Description               |
-|----------|--------------------------------|---------------------------|
-| Name     | `bng-jakarta-01`               | Human-readable identifier |
-| URL      | `http://192.168.1.100:8470`    | dawos-agent base URL      |
-| API Key  | `your-dawos-agent-api-key`     | From `/etc/dawos-agent/agent.env` |
-| Location | `Jakarta DC-1` (optional)      | Physical location         |
-
-> **Important:** Change the default admin password immediately after first login.
+> **Tip:** The first account created is always assigned the `admin` role.
 
 ---
 

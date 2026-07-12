@@ -53,7 +53,10 @@ jobs:
       - name: Build
         env:
           NEXTAUTH_SECRET: build-placeholder
-        run: pnpm build
+          DATABASE_URL: file:./ci-build.db
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm build
 
       - name: Publish
         env:

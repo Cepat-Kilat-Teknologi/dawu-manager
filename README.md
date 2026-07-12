@@ -54,14 +54,9 @@ pnpm dev
 ### First-Time Setup
 
 On first launch, you'll be redirected to `/setup` to create your admin account.
+Enter your name, email, and a strong password — there are no hardcoded defaults.
 
-| Field    | Default Value      |
-|----------|--------------------|
-| Name     | admin              |
-| Email    | admin@dawu.local   |
-| Password | dawu               |
-
-> **Important:** Change the default password immediately after first login.
+> **Tip:** The first account created is always assigned the `admin` role.
 
 ---
 

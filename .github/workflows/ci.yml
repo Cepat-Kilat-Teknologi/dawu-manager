@@ -70,5 +70,9 @@ jobs:
       - name: Set required env for build
         run: |
           echo "NEXTAUTH_SECRET=ci-build-placeholder" >> $GITHUB_ENV
+          echo "DATABASE_URL=file:./ci-build.db" >> $GITHUB_ENV
+
+      - name: Create build database
+        run: pnpm exec prisma migrate deploy
 
       - run: pnpm build
