@@ -1,0 +1,37 @@
+[Unit]
+Description=dawu-manager — BNG fleet management dashboard
+Documentation=https://github.com/Cepat-Kilat-Teknologi/dawu-manager
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dawu
+Group=dawu
+WorkingDirectory=/opt/dawu-manager
+
+EnvironmentFile=/etc/dawu-manager/dawu.env
+
+ExecStart=/usr/bin/env npx dawu-manager --port ${PORT}
+
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/dawu-manager
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=512M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dawu-manager
+
+[Install]
+WantedBy=multi-user.target

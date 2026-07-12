@@ -1,10 +1,38 @@
 {
   "name": "dawu-manager",
   "version": "0.1.0",
-  "private": true,
+  "description": "Web management dashboard for dawos-agent BNG nodes — manage multiple PPPoE/accel-ppp instances from a single UI",
+  "author": "Cepat Kilat Teknologi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cepat-Kilat-Teknologi/dawu-manager.git"
+  },
+  "homepage": "https://github.com/Cepat-Kilat-Teknologi/dawu-manager",
+  "keywords": [
+    "bng",
+    "pppoe",
+    "accel-ppp",
+    "dawos",
+    "isp",
+    "noc",
+    "network-management",
+    "dashboard"
+  ],
   "bin": {
     "dawu-manager": "./bin/cli.mjs"
   },
+  "files": [
+    "bin/",
+    ".next/standalone/",
+    ".next/static/",
+    "public/",
+    "prisma/migrations/",
+    "prisma/schema.prisma",
+    "migrate.mjs",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "next dev --port 3789",
     "build": "prisma generate && next build",

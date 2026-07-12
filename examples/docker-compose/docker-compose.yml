@@ -1,0 +1,23 @@
+services:
+  dawu-manager:
+    image: ghcr.io/cepat-kilat-teknologi/dawu-manager:latest
+    container_name: dawu-manager
+    ports:
+      - "${PORT:-3789}:3789"
+    volumes:
+      - dawu-data:/data
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=file:/data/dawu.db
+      - AUTH_TRUST_HOST=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:3789/api/auth/csrf"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  dawu-data:
