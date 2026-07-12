@@ -167,7 +167,7 @@ throughput, jumlah node online/degraded/offline, top node by load.
 | P2a | Live event feed (feed aktivitas) | Sedang | Tinggi | ✅ Selesai (`d53134e`) — `/audit`, poll AuditLog* |
 | P2b | Alert rules & history | Besar | Sangat tinggi | ✅ Selesai (`d71c320`) — `/alerts`, rules CRUD + evaluator + webhook |
 | P3 | ~50 write endpoint (7 grup) | Besar (bertahap) | Sedang–tinggi | ✅ Selesai — bulk/dns/firewall/scheduler/zone/vrrp/hooks; 5 gap dawos-agent tercatat di `docs/DAWOS_AGENT_GAPS.md` |
-| P4a | Operasi lintas-node | Besar | Tinggi | ⬜ Belum |
+| P4a | Operasi lintas-node | Besar | Tinggi | ✅ Selesai — `/operations` page + `POST /api/fleet/operations` concurrent fan-out, 3 ops (health/restart/bulk-terminate), RBAC operator+, confirm dialogs |
 | P4b | Audit trail | Sedang | Sedang–tinggi | ✅ Selesai — filter by user/node/action/date-range + CSV export |
 | P4c | Dashboard overview agregat | Sedang | Sedang–tinggi | ✅ Selesai — live fleet stats, top nodes by load, graceful degradation |
 | P5 | Vuln + polish | Kecil | Sedang | ⬜ Belum |
