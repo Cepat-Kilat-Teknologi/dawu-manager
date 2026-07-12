@@ -453,8 +453,7 @@ describe("SessionsPage bulk operations", () => {
       fireEvent.click(screen.getByTestId("confirm-btn"));
     });
     expect(mutations.get("bulk/ratelimit")!.mutateAsync).toHaveBeenCalledWith({
-      usernames: ["alice"],
-      rate: "5M/20M",
+      items: [{ username: "alice", rate: "5M/20M" }],
     });
     expect(screen.queryByTestId("confirm-dialog")).toBeNull();
   });

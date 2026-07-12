@@ -134,8 +134,7 @@ export default function SessionsPage() {
   );
 
   const bulkRatelimit = useNodeProxyMutation<{
-    usernames: string[];
-    rate: string;
+    items: { username: string; rate: string }[];
   }>(nodeId, "bulk/ratelimit", {
     invalidates: ["sessions", "traffic"],
     onSuccess: () => toast.success("Rate limits applied"),
@@ -155,7 +154,9 @@ export default function SessionsPage() {
     if (confirmAction === "terminate") {
       await bulkTerminate.mutateAsync({ usernames: users });
     } else if (confirmAction === "ratelimit") {
-      await bulkRatelimit.mutateAsync({ usernames: users, rate: bulkRate });
+      await bulkRatelimit.mutateAsync({
+        items: users.map((username) => ({ username, rate: bulkRate })),
+      });
     } else {
       await bulkShaperRestore.mutateAsync({ usernames: users });
     }
