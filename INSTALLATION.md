@@ -150,9 +150,9 @@ The dev server starts on http://localhost:3789 with Turbopack hot-reload.
 ### 6. Run tests
 
 ```bash
-pnpm test              # Run all 1115 tests
+pnpm test              # Run all tests
 pnpm test:watch        # Watch mode
-pnpm test:coverage     # With 100% coverage enforcement
+pnpm test:coverage     # With coverage report
 ```
 
 ---
