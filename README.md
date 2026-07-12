@@ -248,36 +248,28 @@ src/
 ## Testing
 
 - **1115 tests** across 88 test files
-- **100% coverage** (statements, branches, functions, lines)
 - Framework: Vitest 4 + React Testing Library + happy-dom
 
 ```bash
 pnpm test              # Run all tests
-pnpm test:coverage     # Run with coverage thresholds enforced
-```
-
-### Coverage Thresholds
-
-```
-Statements: 100%
-Branches:   100%
-Functions:  100%
-Lines:      100%
+pnpm test:coverage     # Run with coverage report
 ```
 
 ---
 
 ## Database Schema
 
-dawu-manager uses an embedded SQLite database with four models:
+dawu-manager uses an embedded SQLite database with seven models:
 
-| Model      | Purpose                                   |
-|------------|-------------------------------------------|
-| `User`     | Dashboard users with roles (admin/operator/viewer) |
-| `Session`  | Browser sessions (JWT-backed)             |
-| `Node`     | Managed dawos-agent instances             |
-| `AuditLog` | Central audit trail for all operations    |
-| `Setting`  | Key-value configuration store             |
+| Model        | Purpose                                            |
+|--------------|----------------------------------------------------|
+| `User`       | Dashboard users with roles (admin/operator/viewer) |
+| `Session`    | Browser sessions (JWT-backed)                      |
+| `Node`       | Managed dawos-agent instances                      |
+| `AuditLog`   | Central audit trail for all operations             |
+| `Setting`    | Key-value configuration store                      |
+| `AlertRule`  | Threshold-based alert rule definitions             |
+| `AlertEvent` | Alert event history (triggered alerts)             |
 
 ---
 
@@ -310,21 +302,19 @@ dawu-manager uses an embedded SQLite database with four models:
 
 ---
 
+## Documentation
+
+Full documentation is available at **[cepat-kilat-teknologi.github.io/dawu-manager](https://cepat-kilat-teknologi.github.io/dawu-manager/)**.
+
+Covers installation, configuration, user guide, deployment (Docker, systemd, Nginx), architecture deep dives, API reference, and development guides.
+
+---
+
 ## Contributing
 
-See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, test patterns, and pull request guidelines.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feat/amazing-feature`)
-3. Make your changes with tests
-4. Ensure all quality gates pass:
-   ```bash
-   pnpm lint
-   pnpm test:coverage
-   pnpm build
-   ```
-5. Commit with conventional commits (`feat:`, `fix:`, `docs:`, etc.)
-6. Open a Pull Request
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines.
 
 ---
 
