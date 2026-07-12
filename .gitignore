@@ -48,7 +48,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Claude Code AI instructions (private, not committed)
+# Local development instructions (not committed)
 CLAUDE.md
 AGENTS.md
 .agents/
@@ -77,3 +77,6 @@ prisma/migrations/**/migration_lock.toml
 .playwright-mcp/
 test-results/
 redesign-*.png
+
+# MkDocs build output
+/site/
