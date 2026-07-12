@@ -4,7 +4,7 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 0.1.x   | :white_check_mark: |
+| 0.1.x   | Yes |
 
 Only the latest minor release receives security updates. We recommend always running the most recent version.
 
@@ -63,9 +63,9 @@ Three roles with escalating permissions:
 
 | Role       | Read | Write | Admin |
 |------------|:----:|:-----:|:-----:|
-| `viewer`   | :white_check_mark: | :x: | :x: |
-| `operator` | :white_check_mark: | :white_check_mark: | :x: |
-| `admin`    | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| `viewer`   | Yes | No | No |
+| `operator` | Yes | Yes | No |
+| `admin`    | Yes | Yes | Yes |
 
 - Role enforcement is applied at the API route level
 - Navigation items are filtered by role in the sidebar
@@ -112,13 +112,7 @@ Set this as the `NEXTAUTH_SECRET` environment variable. This secret is used for:
 
 **Never use the auto-generated development secret in production.**
 
-### 2. Change default credentials
-
-After first-time setup, immediately change the default admin password:
-- Default email: `admin@dawu.local`
-- Default password: `dawu`
-
-### 3. Use HTTPS in production
+### 2. Use HTTPS in production
 
 Set `NEXTAUTH_URL` to your HTTPS URL:
 
@@ -128,7 +122,7 @@ NEXTAUTH_URL=https://dawu.example.com
 
 Use a reverse proxy (nginx, Caddy, Traefik) to terminate TLS.
 
-### 4. Restrict network access
+### 3. Restrict network access
 
 dawu-manager should be accessible only from trusted networks:
 
@@ -138,7 +132,7 @@ PORT=3000
 # Use firewall rules to restrict access
 ```
 
-### 5. Secure the database file
+### 4. Secure the database file
 
 The SQLite database contains encrypted API keys and password hashes:
 
@@ -150,19 +144,19 @@ docker volume inspect dawu-data
 chmod 600 ~/.dawu-manager/data.db
 ```
 
-### 6. Keep dependencies updated
+### 5. Keep dependencies updated
 
 ```bash
 pnpm update
 pnpm audit
 ```
 
-### 7. Docker-specific hardening
+### 6. Docker-specific hardening
 
 The production Docker image:
 - Runs as non-root user (`nextjs:nodejs`, UID 1001)
 - Uses multi-stage build (no dev dependencies in production)
-- Based on `node:20-alpine` (minimal attack surface)
+- Based on `node:22-alpine` (minimal attack surface)
 - Disables Next.js telemetry (`NEXT_TELEMETRY_DISABLED=1`)
 
 ---
