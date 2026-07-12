@@ -33,7 +33,6 @@ docker compose up -d
 
 Open http://localhost:3789 in your browser. On first launch, you'll be redirected to the setup page.
 
-Fill in the admin account details:
 Fill in your admin account details:
 
 - **Name** — your display name
@@ -206,15 +205,15 @@ dawu-manager implements three user roles:
 
 | Capability               | Viewer | Operator | Admin |
 |--------------------------|:------:|:--------:|:-----:|
-| View dashboard           | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| View node list           | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| View node detail         | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Check node health        | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| Add/edit/delete nodes    | :x: | :white_check_mark: | :white_check_mark: |
-| Proxy operations (write) | :x: | :white_check_mark: | :white_check_mark: |
-| Manage users             | :x: | :x: | :white_check_mark: |
-| View audit log           | :x: | :x: | :white_check_mark: |
-| Change settings          | :x: | :x: | :white_check_mark: |
+| View dashboard           | Yes | Yes | Yes |
+| View node list           | Yes | Yes | Yes |
+| View node detail         | Yes | Yes | Yes |
+| Check node health        | Yes | Yes | Yes |
+| Add/edit/delete nodes    | No  | Yes | Yes |
+| Proxy operations (write) | No  | Yes | Yes |
+| Manage users             | No  | No  | Yes |
+| View audit log           | No  | No  | Yes |
+| Change settings          | No  | No  | Yes |
 
 ### Role Descriptions
 
