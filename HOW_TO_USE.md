@@ -142,15 +142,24 @@ The node detail page provides deep access to each BNG node's functionality throu
 
 ### Available Sections
 
-| Section     | Description                                         |
-|-------------|-----------------------------------------------------|
-| **Overview**| Node info, health status, dawos-agent version       |
-| **Sessions**| Active PPPoE sessions — view, search, terminate     |
-| **Service** | accel-ppp service management — start, stop, restart |
-| **Firewall**| nftables firewall rules and groups                  |
-| **Network** | Network interfaces, routing, VLAN management        |
-| **Traffic** | Traffic shaping and rate limiting                   |
-| **Config**  | accel-ppp configuration editor                      |
+| Section         | Description                                           |
+|-----------------|-------------------------------------------------------|
+| **Overview**    | Node info, health status, dawos-agent version         |
+| **Sessions**    | Active PPPoE sessions — view, search, terminate       |
+| **Service**     | accel-ppp service management — start, stop, restart   |
+| **Config**      | accel-ppp configuration editor with guard-timer       |
+| **Firewall**    | nftables rules, NAT, groups, sysctl, conntrack        |
+| **Network**     | Network interfaces, routes, VLAN management           |
+| **Traffic**     | Traffic shaping, rate limiting, live charts            |
+| **PPPoE**       | PPPoE interfaces, MAC filters, PADO delay             |
+| **Routing**     | Dynamic routing (BGP, OSPF, RIP, BFD)                 |
+| **IP Pool**     | IP address pool management                            |
+| **Monitoring**  | Monitoring exporters and metrics                      |
+| **Logs**        | Log viewer and real-time streaming                    |
+| **System**      | System information, health, metrics                   |
+| **DHCP**        | DHCP server and relay management                      |
+| **Diagnostics** | Zones, conntrack entries, limits, event hooks          |
+| **Events**      | Event hooks and webhook management                    |
 
 ### Proxy Access
 

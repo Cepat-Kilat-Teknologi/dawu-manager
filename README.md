@@ -120,24 +120,59 @@ BNG node credentials (API keys) are **never exposed** to the browser.
 
 ---
 
-## API Routes
+## Routes
 
-dawu-manager exposes 13 routes:
+dawu-manager exposes 40 routes (26 pages + 14 API endpoints):
 
-| Route                                  | Method(s)        | Auth | Purpose                          |
-|----------------------------------------|------------------|:----:|----------------------------------|
-| `/`                                    | GET              | Yes  | Dashboard overview               |
-| `/login`                               | GET              | No   | Login page                       |
-| `/setup`                               | GET              | No   | First-run admin setup            |
-| `/nodes`                               | GET              | Yes  | Node list                        |
-| `/nodes/new`                           | GET              | Yes  | Add node form                    |
-| `/nodes/[nodeId]`                      | GET              | Yes  | Node detail + health             |
-| `/api/auth/[...nextauth]`              | GET, POST        | —    | NextAuth endpoints               |
-| `/api/setup`                           | POST             | No   | Admin creation (first-run only)  |
-| `/api/nodes`                           | GET, POST        | Yes  | Node CRUD (list, create)         |
-| `/api/nodes/[nodeId]`                  | GET, PUT, DELETE  | Yes  | Node CRUD (read, update, delete) |
-| `/api/nodes/[nodeId]/health`           | GET              | Yes  | Health check + status update     |
-| `/api/nodes/[nodeId]/proxy/[...path]`  | ANY              | Yes  | Universal dawos-agent proxy      |
+### Pages (26)
+
+| Route | Auth | Purpose |
+|-------|:----:|---------|
+| `/login` | No | Login page |
+| `/setup` | No | First-run admin setup |
+| `/` | Yes | Dashboard overview (fleet stats) |
+| `/nodes` | Yes | Node list |
+| `/nodes/new` | Yes | Add node form |
+| `/nodes/[nodeId]` | Yes | Node detail + health |
+| `/nodes/[nodeId]/sessions` | Yes | PPPoE session management |
+| `/nodes/[nodeId]/service` | Yes | accel-ppp service control |
+| `/nodes/[nodeId]/config` | Yes | Configuration editor |
+| `/nodes/[nodeId]/firewall` | Yes | Firewall rules + NAT + groups |
+| `/nodes/[nodeId]/network` | Yes | Interfaces, routes, VLANs |
+| `/nodes/[nodeId]/traffic` | Yes | Traffic monitoring + shaping |
+| `/nodes/[nodeId]/pppoe` | Yes | PPPoE interfaces + MAC filters |
+| `/nodes/[nodeId]/routing` | Yes | BGP, OSPF, RIP, BFD |
+| `/nodes/[nodeId]/ip-pool` | Yes | IP address pool management |
+| `/nodes/[nodeId]/monitoring` | Yes | Monitoring exporters + metrics |
+| `/nodes/[nodeId]/logs` | Yes | Log viewer + streaming |
+| `/nodes/[nodeId]/system` | Yes | System info + metrics |
+| `/nodes/[nodeId]/dhcp` | Yes | DHCP server + relay |
+| `/nodes/[nodeId]/diagnostics` | Yes | Diagnostics + zones + conntrack |
+| `/nodes/[nodeId]/events` | Yes | Event hooks + webhooks |
+| `/audit` | Yes | Central audit trail (filters + CSV export) |
+| `/alerts` | Yes | Alert rules + history |
+| `/operations` | Yes | Cross-node fleet operations |
+| `/users` | Yes | User management (admin) |
+| `/settings` | Yes | Global settings (admin) |
+
+### API Endpoints (14)
+
+| Route | Method(s) | Auth | Purpose |
+|-------|-----------|:----:|---------|
+| `/api/auth/[...nextauth]` | GET, POST | — | NextAuth handler |
+| `/api/setup` | POST | No | First-run admin creation |
+| `/api/nodes` | GET, POST | Yes | Node list + create |
+| `/api/nodes/[nodeId]` | GET, PUT, DELETE | Yes | Node CRUD |
+| `/api/nodes/[nodeId]/health` | GET | Yes | Health check + status update |
+| `/api/nodes/[nodeId]/proxy/[...path]` | ANY | Yes | Universal dawos-agent proxy |
+| `/api/nodes/[nodeId]/stream/[...path]` | GET | Yes | SSE streaming proxy |
+| `/api/activity` | GET | Yes | Audit log entries |
+| `/api/activity/export` | GET | Yes | Audit log CSV export |
+| `/api/alerts/rules` | GET, POST | Yes | Alert rules CRUD |
+| `/api/alerts/rules/[id]` | GET, PUT, DELETE | Yes | Alert rule by ID |
+| `/api/alerts/events` | GET | Yes | Alert event history |
+| `/api/fleet/operations` | POST | Yes | Cross-node fan-out operations |
+| `/api/fleet/overview` | GET | Yes | Fleet aggregate stats |
 
 ---
 
@@ -186,32 +221,38 @@ src/
 ├── app/
 │   ├── (auth)/             # Login + setup pages (centered layout)
 │   ├── (dashboard)/        # Protected pages (sidebar + header layout)
-│   │   ├── nodes/          # Node list, add, detail (with loading skeletons)
-│   │   └── page.tsx        # Dashboard overview
+│   │   ├── alerts/         # Alert rules + history
+│   │   ├── audit/          # Audit trail (filters + CSV export)
+│   │   ├── nodes/          # Node list, add, detail
+│   │   │   └── [nodeId]/   # 15 category pages (sessions, firewall, config, etc.)
+│   │   ├── operations/     # Cross-node fleet operations
+│   │   ├── settings/       # Global settings
+│   │   ├── users/          # User management
+│   │   └── page.tsx        # Dashboard overview (fleet stats)
 │   └── api/
+│       ├── activity/       # Audit log API + CSV export
+│       ├── alerts/         # Alert rules + events API
 │       ├── auth/           # NextAuth handler
-│       ├── nodes/          # CRUD + health + proxy
+│       ├── fleet/          # Fleet operations + overview API
+│       ├── nodes/          # CRUD + health + proxy + SSE stream
 │       └── setup/          # First-run admin creation
 ├── components/
 │   ├── ui/                 # shadcn/ui primitives
 │   ├── layout/             # Sidebar, header, mobile-nav
 │   ├── dashboard/          # Stat card, node card
 │   └── shared/             # Status badge, loading skeleton, confirm dialog
+├── hooks/                  # TanStack Query hooks (node proxy, mutations)
 ├── lib/                    # Auth, DB, crypto, dawos-client, utils
 ├── config/                 # Navigation data
 ├── types/                  # NextAuth type augmentation
-└── __tests__/              # All test files (mirrors src/ structure)
-    ├── api/                # API route tests
-    ├── components/         # Component tests
-    ├── lib/                # Library tests
-    └── pages/              # Page tests
+└── __tests__/              # 88 test files (mirrors src/ structure)
 ```
 
 ---
 
 ## Testing
 
-- **259 tests** across 29 test files
+- **1115 tests** across 88 test files
 - **100% coverage** (statements, branches, functions, lines)
 - Framework: Vitest 4 + React Testing Library + happy-dom
 

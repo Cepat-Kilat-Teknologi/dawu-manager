@@ -13,7 +13,7 @@
 | Fitur create/edit | Baru ada di 6 halaman (network route/VLAN, pppoe interface/MAC-filter, firewall validate, ip-pool add, config check, monitoring exporter) |
 | Real-time | Chart traffic (SSE) ✅ · WebSocket `/ws/events` **belum dikonsumsi** |
 | Alerting | **Belum ada** |
-| Kualitas | 786 test, 100% coverage, lint clean, build pass |
+| Kualitas | 1115 test, 100% coverage, lint clean, build pass |
 
 **Prinsip utama rekomendasi ini:** jangan menambah fitur baru sebelum fitur write
 yang sudah ada terbukti benar terhadap node sungguhan. Ini infrastruktur ISP

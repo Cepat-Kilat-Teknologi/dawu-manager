@@ -6,16 +6,15 @@ copes meanwhile. Maintained per the format in `PROMPT_P3_P4.md` section 4.
 
 ---
 
-## 1. No aggregate network throughput endpoint
+## 1. ~~No aggregate network throughput endpoint~~ — RESOLVED (dawos-agent v0.3.3)
 
 | Field | Detail |
 |-------|--------|
-| **Endpoint** | `GET` — no path exists |
+| **Endpoint** | `GET network/throughput` — **now available in dawos-agent v0.3.3** |
 | **Feature** | P4c dashboard overview: "Aggregate throughput (sum of rx/tx)" |
-| **What is wrong** | Missing. dawos-agent exposes no per-node or aggregate network throughput (rx/tx bytes or bps) endpoint. `system/metrics` returns CPU/memory/disk only. `sessions/stats` returns session counts and CPU string. `monitoring/metrics` proxies node_exporter (404 when inactive) and is Prometheus-format, not JSON — unsuitable for quick aggregation. |
-| **Expected contract** | `GET system/metrics` or a new `GET traffic/stats` returning `{ rx_bytes: number, tx_bytes: number, rx_bps: number, tx_bps: number }` (or per-interface breakdown). |
-| **Severity** | Degrades feature — throughput tile omitted from fleet overview. |
-| **Coping strategy** | Fleet overview omits throughput entirely. The stat card row shows active subscribers, online/offline/degraded counts instead. When dawos-agent adds a throughput endpoint, dawu-manager can add a fifth stat card with no structural changes. |
+| **What was wrong** | Missing. dawos-agent exposed no per-node or aggregate network throughput endpoint. |
+| **Resolution** | dawos-agent v0.3.3 (2026-07-12) added `GET /api/v1/network/throughput`. Returns `{ interfaces: [{ name, rx_bytes, tx_bytes }] }` with per-interface byte counters. dawos-cli v0.3.3 also added `dawos network throughput` command with human-readable formatting. |
+| **dawu-manager action** | Can now add a throughput stat card to the fleet overview by aggregating `rx_bytes`/`tx_bytes` across nodes. Wire via `useNodeProxy(nodeId, "network/throughput")`. |
 
 ## 2. `sessions/stats` returns string fields
 
@@ -50,13 +49,12 @@ copes meanwhile. Maintained per the format in `PROMPT_P3_P4.md` section 4.
 | **Severity** | Cosmetic — fixed in dawu-manager by changing proxy path from `firewall/zones` to `zones`. |
 | **Coping strategy** | dawu-manager now uses `zones` as the proxy path for all zone operations (read, create, delete). No dawos-agent change needed. |
 
-## 5. No `conntrack/flush` endpoint
+## 5. ~~No `conntrack/flush` endpoint~~ — RESOLVED (dawos-agent v0.3.3)
 
 | Field | Detail |
 |-------|--------|
-| **Endpoint** | `POST conntrack/flush` — does not exist |
+| **Endpoint** | `POST conntrack/flush` — **now available in dawos-agent v0.3.3** |
 | **Feature** | P3 Group 7: conntrack tuning (diagnostics page) |
-| **What is wrong** | Missing. dawos-agent exposes `GET conntrack/entries` and `PUT conntrack/settings` but has no endpoint to flush/clear the conntrack table. |
-| **Expected contract** | `POST conntrack/flush` returning `{ message: "Conntrack table flushed" }` or similar. |
-| **Severity** | Degrades feature — conntrack flush button cannot be implemented. |
-| **Coping strategy** | dawu-manager omits the flush action. The diagnostics page shows conntrack entries (read-only) and allows updating conntrack settings via `PUT conntrack/settings`. Flush can be added when dawos-agent implements the endpoint. |
+| **What was wrong** | Missing. dawos-agent had no endpoint to flush/clear the conntrack table. |
+| **Resolution** | dawos-agent v0.3.3 (2026-07-12) added `POST /api/v1/conntrack/flush`. Returns `{ entries_before: N }` with the count of flushed entries. dawos-cli v0.3.3 also added `dawos conntrack flush` command. |
+| **dawu-manager action** | Can now wire a "Flush Conntrack" button on the diagnostics page via `useNodeProxyMutation(nodeId, "conntrack/flush")`. Destructive — requires `ConfirmDialog`. |
