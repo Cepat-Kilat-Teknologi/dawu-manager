@@ -1,0 +1,84 @@
+site_name: dawu-manager
+site_description: Web management dashboard for dawos-agent BNG nodes. Manage multiple PPPoE/accel-ppp instances from a single UI.
+site_url: https://cepat-kilat-teknologi.github.io/dawu-manager/
+repo_url: https://github.com/Cepat-Kilat-Teknologi/dawu-manager
+repo_name: Cepat-Kilat-Teknologi/dawu-manager
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - First-Run Setup: getting-started/first-run.md
+  - User Guide:
+      - Dashboard Overview: user-guide/dashboard.md
+      - Node Management: user-guide/node-management.md
+      - Health Monitoring: user-guide/health-monitoring.md
+      - Node Feature Pages: user-guide/node-features.md
+      - Fleet Operations: user-guide/fleet-operations.md
+      - Audit Trail: user-guide/audit-trail.md
+      - Alerts: user-guide/alerts.md
+      - User Management: user-guide/user-management.md
+  - Deployment:
+      - Docker: deployment/docker.md
+      - Systemd Service: deployment/systemd.md
+      - Nginx Reverse Proxy: deployment/nginx.md
+      - Production Hardening: deployment/production.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Proxy Layer: architecture/proxy-layer.md
+      - Database Schema: architecture/database.md
+      - Authentication and RBAC: architecture/authentication.md
+      - UI Design System: architecture/design-system.md
+  - API:
+      - Endpoint Reference: api/reference.md
+      - dawos-agent Coverage: api/dawos-agent-coverage.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+      - Changelog: development/changelog.md
+  - Security: security.md
+  - Code of Conduct: code-of-conduct.md
