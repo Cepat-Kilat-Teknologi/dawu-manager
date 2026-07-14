@@ -117,9 +117,9 @@ BNG node credentials (API keys) are **never exposed** to the browser.
 
 ## Routes
 
-dawu-manager exposes 40 routes (26 pages + 14 API endpoints):
+dawu-manager exposes 42 routes (28 pages + 14 API endpoints):
 
-### Pages (26)
+### Pages (28)
 
 | Route | Auth | Purpose |
 |-------|:----:|---------|
@@ -144,6 +144,8 @@ dawu-manager exposes 40 routes (26 pages + 14 API endpoints):
 | `/nodes/[nodeId]/dhcp` | Yes | DHCP server + relay |
 | `/nodes/[nodeId]/diagnostics` | Yes | Diagnostics + zones + conntrack |
 | `/nodes/[nodeId]/events` | Yes | Event hooks + webhooks |
+| `/nodes/[nodeId]/history` | Yes | Session history + snapshots + CSV export |
+| `/nodes/[nodeId]/radius` | Yes | RADIUS diagnostics + health check |
 | `/audit` | Yes | Central audit trail (filters + CSV export) |
 | `/alerts` | Yes | Alert rules + history |
 | `/operations` | Yes | Cross-node fleet operations |
@@ -219,7 +221,7 @@ src/
 │   │   ├── alerts/         # Alert rules + history
 │   │   ├── audit/          # Audit trail (filters + CSV export)
 │   │   ├── nodes/          # Node list, add, detail
-│   │   │   └── [nodeId]/   # 15 category pages (sessions, firewall, config, etc.)
+│   │   │   └── [nodeId]/   # 17 category pages (sessions, firewall, config, history, radius, etc.)
 │   │   ├── operations/     # Cross-node fleet operations
 │   │   ├── settings/       # Global settings
 │   │   ├── users/          # User management
@@ -240,14 +242,14 @@ src/
 ├── lib/                    # Auth, DB, crypto, dawos-client, utils
 ├── config/                 # Navigation data
 ├── types/                  # NextAuth type augmentation
-└── __tests__/              # 88 test files (mirrors src/ structure)
+└── __tests__/              # 90 test files (mirrors src/ structure)
 ```
 
 ---
 
 ## Testing
 
-- **1115 tests** across 88 test files
+- **1176 tests** across 90 test files
 - Framework: Vitest 4 + React Testing Library + happy-dom
 
 ```bash
