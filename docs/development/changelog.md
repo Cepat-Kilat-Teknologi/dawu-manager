@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Session history page** (`/nodes/[nodeId]/history`) -- Session history table with stats grid, snapshot creation, CSV export, and purge with confirmation dialog.
+- **RADIUS diagnostics page** (`/nodes/[nodeId]/radius`) -- RADIUS config and status display, interactive health check with latency reporting and toast feedback.
+- **PPPoE runtime config** -- Live PPPoE runtime configuration display (service name, AC name, session limits) on the PPPoE page.
+- **IP pool detail** -- Per-pool allocation detail with expandable accordion showing IP, username, and session ID for each allocation.
+- **Session history CSV export** -- Export session history entries to CSV file via browser download.
+
 ### Changed
 
-- Updated documentation -- README, INSTALLATION, HOW_TO_USE, DAWOS_AGENT_GAPS to reflect current project state (1115 tests, 40 routes, 88 test files).
-- Marked dawos-agent gaps #1 (network/throughput) and #5 (conntrack/flush) as resolved -- both added in dawos-agent v0.3.3.
+- Updated documentation -- README, CHANGELOG, testing guide, node features guide to reflect current project state (1176 tests, 42 routes, 90 test files, 28 pages, 17 node feature pages).
 
 ---
 
@@ -42,7 +49,7 @@ The initial public release of dawu-manager. Published to npm and ghcr.io.
 ### Added -- Phase 1: Foundation
 
 - **Multi-node management** -- Add, monitor, and control multiple dawos-agent BNG nodes from a single dashboard.
-- **26 pages** -- Dashboard overview, node list, add node, and 15 per-node category pages (sessions, service, config, firewall, network, traffic, pppoe, routing, ip-pool, monitoring, logs, system, dhcp, diagnostics, events) plus audit, alerts, operations, users, settings.
+- **28 pages** -- Dashboard overview, node list, add node, and 17 per-node category pages (sessions, service, config, firewall, network, traffic, pppoe, routing, ip-pool, monitoring, logs, system, dhcp, diagnostics, events, history, radius) plus audit, alerts, operations, users, settings.
 - **14 API routes** -- Auth, setup, node CRUD, health check, universal proxy, SSE streaming, activity/export, alert rules/events, fleet operations/overview.
 - **Role-based access control** -- Admin, operator, viewer roles with route-level enforcement.
 - **API key encryption** -- AES-256-GCM with scrypt-derived keys; API keys encrypted at rest.
@@ -53,7 +60,7 @@ The initial public release of dawu-manager. Published to npm and ghcr.io.
 - **Embedded database** -- SQLite via Prisma 7 with driver adapter pattern.
 - **One-command install** -- `npx dawu-manager` for immediate launch.
 - **Docker image** -- Multi-platform image (amd64 + arm64) published to ghcr.io.
-- **1115 tests** across 88 test files with comprehensive code coverage.
+- **1176 tests** across 90 test files with comprehensive code coverage.
 
 ### Fixed
 
@@ -78,7 +85,7 @@ The initial public release of dawu-manager. Published to npm and ghcr.io.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 0.1.0 | 2026-07-12 | Initial release: multi-node management, 26 pages, 14 API routes, fleet operations, audit trail, alerts |
+| 0.1.0 | 2026-07-12 | Initial release: multi-node management, 28 pages, 14 API routes, fleet operations, audit trail, alerts |
 
 ---
 
