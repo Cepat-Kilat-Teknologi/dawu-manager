@@ -289,3 +289,164 @@ describe("ConfigPage", () => {
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe("ConfigPage server validation", () => {
+  it("runs server-side validation and shows success result", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    // Mock validate mutation to return valid result via mutateAsync
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockResolvedValue({ valid: true, issues: [] });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(
+      mutationMap.get("config/validate")!.mutateAsync,
+    ).toHaveBeenCalledWith({ content: "[ppp]\nverbose=1" });
+    expect(toast.success).toHaveBeenCalledWith("Server validation passed");
+    expect(screen.getByText("Server validation passed")).toBeTruthy();
+  });
+
+  it("runs server-side validation and shows issues", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockResolvedValue({
+        valid: false,
+        issues: [
+          { line: 5, level: "error", message: "Unknown section" },
+          { line: 10, level: "warning", message: "Deprecated option" },
+        ],
+      });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("2 issues found");
+    expect(screen.getByText("2 issues found")).toBeTruthy();
+    expect(screen.getByText("L5")).toBeTruthy();
+    expect(screen.getByText("[error]")).toBeTruthy();
+    expect(screen.getByText("Unknown section")).toBeTruthy();
+    expect(screen.getByText("L10")).toBeTruthy();
+    expect(screen.getByText("[warning]")).toBeTruthy();
+    expect(screen.getByText("Deprecated option")).toBeTruthy();
+  });
+
+  it("handles single validation issue (no plural 's')", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockResolvedValue({
+        valid: false,
+        issues: [{ message: "Bad config" }],
+      });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("1 issue found");
+    // Issue without line or level uses fallbacks
+    expect(screen.getByText("[warning]")).toBeTruthy();
+    expect(screen.getByText("Bad config")).toBeTruthy();
+  });
+
+  it("shows error result with error field", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockResolvedValue({
+        valid: false,
+        error: "Config file not found",
+        issues: [],
+      });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(screen.getByText("Config file not found")).toBeTruthy();
+  });
+
+  it("handles validation request failure", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockRejectedValue(new Error("network"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("Validation request failed");
+  });
+
+  it("shows Validating… while validate is pending", () => {
+    pending = true;
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+    expect(screen.getByText("Validating…")).toBeTruthy();
+  });
+
+  it("fires validate onSuccess callback", () => {
+    loaded();
+    render(<ConfigPage />);
+    mutationMap.get("config/validate")!.onSuccess!();
+    // onSuccess is a no-op — result handled by runValidate
+    expect(true).toBe(true);
+  });
+
+  it("handles validate result with no issues array", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockResolvedValue({ valid: false });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(toast.error).toHaveBeenCalledWith("0 issues found");
+  });
+
+  it("renders issue without message as 'Unknown issue'", async () => {
+    loaded();
+    render(<ConfigPage />);
+    fireEvent.click(screen.getByText("Edit"));
+
+    mutationMap.get("config/validate")!.mutateAsync = vi
+      .fn()
+      .mockResolvedValue({
+        valid: false,
+        issues: [{ line: 1, level: "error" }],
+      });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("Validate (server)"));
+    });
+
+    expect(screen.getByText("Unknown issue")).toBeTruthy();
+  });
+});

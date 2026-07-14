@@ -17,7 +17,23 @@ import {
   Pencil,
   X,
   FileCheck,
+  ShieldCheck,
+  AlertTriangle,
 } from "lucide-react";
+
+/** Server-side validation issue from `config/validate`. */
+interface ValidationIssue {
+  line?: number;
+  level?: string;
+  message?: string;
+}
+
+/** Response shape from `POST config/validate`. */
+interface ValidateResponse {
+  valid?: boolean;
+  issues?: ValidationIssue[];
+  error?: string;
+}
 
 interface ConfigBackup {
   name: string;
@@ -70,6 +86,9 @@ export default function ConfigPage() {
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
+  const [validateResult, setValidateResult] = useState<ValidateResponse | null>(
+    null,
+  );
 
   const config = useNodeProxy<ConfigData>(nodeId, "config");
   const backups = useNodeProxy<ConfigBackup[]>(nodeId, "config/backups");
@@ -102,6 +121,34 @@ export default function ConfigPage() {
       setEditing(false);
     },
   });
+
+  const validateMutation = useNodeProxyMutation<{ content: string }>(
+    nodeId,
+    "config/validate",
+    {
+      onSuccess: () => {
+        /* result handled by runValidate */
+      },
+    },
+  );
+
+  async function runValidate() {
+    setValidateResult(null);
+    try {
+      const res = (await validateMutation.mutateAsync({
+        content: draft,
+      })) as ValidateResponse;
+      setValidateResult(res);
+      if (res.valid) {
+        toast.success("Server validation passed");
+      } else {
+        const count = res.issues?.length ?? 0;
+        toast.error(`${count} issue${count !== 1 ? "s" : ""} found`);
+      }
+    } catch {
+      toast.error("Validation request failed");
+    }
+  }
 
   /** Enter edit mode, seeding the draft from the currently loaded config. */
   function startEditing() {
@@ -145,6 +192,19 @@ export default function ConfigPage() {
                 disabled={applyMutation.isPending}
               >
                 <FileCheck className="mr-1.5 h-3.5 w-3.5" /> Check syntax
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => runValidate()}
+                disabled={validateMutation.isPending || applyMutation.isPending}
+              >
+                {validateMutation.isPending ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                {validateMutation.isPending ? "Validating…" : "Validate (server)"}
               </Button>
               <Button
                 size="sm"
@@ -211,6 +271,61 @@ export default function ConfigPage() {
               aria-label="Configuration content"
               className="h-96 w-full resize-y rounded-md border bg-muted/40 p-4 font-mono text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
+            {/* Server-side validation results */}
+            {validateResult && (
+              <div className="rounded-lg border p-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  {validateResult.valid ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                      <span className="text-emerald-600">
+                        Server validation passed
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      <span className="text-amber-600">
+                        {validateResult.issues?.length ?? 0} issue
+                        {(validateResult.issues?.length ?? 0) !== 1 ? "s" : ""}{" "}
+                        found
+                      </span>
+                    </>
+                  )}
+                </div>
+                {validateResult.error && (
+                  <p className="mt-2 text-xs text-destructive">
+                    {validateResult.error}
+                  </p>
+                )}
+                {validateResult.issues && validateResult.issues.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {validateResult.issues.map((issue, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-2 text-xs"
+                      >
+                        {issue.line != null && (
+                          <span className="shrink-0 font-mono text-muted-foreground">
+                            L{issue.line}
+                          </span>
+                        )}
+                        <span
+                          className={
+                            issue.level === "error"
+                              ? "text-destructive"
+                              : "text-amber-600"
+                          }
+                        >
+                          [{issue.level ?? "warning"}]
+                        </span>
+                        <span>{issue.message ?? "Unknown issue"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <pre className="max-h-96 overflow-auto rounded-md bg-muted p-4 font-mono text-xs whitespace-pre-wrap">
