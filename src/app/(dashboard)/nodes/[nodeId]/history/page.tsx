@@ -49,7 +49,7 @@ export default function HistoryPage() {
   const [confirmPurge, setConfirmPurge] = useState(false);
 
   const history = useNodeProxy<HistoryEntry[]>(nodeId, "sessions/history", {
-    extract: "sessions",
+    extract: "records",
   });
   const historyStats = useNodeProxy<HistoryStats>(
     nodeId,
