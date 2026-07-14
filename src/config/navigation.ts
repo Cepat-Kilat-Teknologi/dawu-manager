@@ -19,6 +19,8 @@ import {
   Layers,
   BellRing,
   Play,
+  History,
+  CircleDot,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +73,7 @@ export const nodeNavSections: NodeNavSection[] = [
     items: [
       { title: "Overview", href: "", icon: LayoutDashboard },
       { title: "Sessions", href: "/sessions", icon: Users },
+      { title: "History", href: "/history", icon: History },
       { title: "Service", href: "/service", icon: Activity },
       { title: "Config", href: "/config", icon: Settings },
       { title: "Logs", href: "/logs", icon: ScrollText },
@@ -91,6 +94,7 @@ export const nodeNavSections: NodeNavSection[] = [
     items: [
       { title: "PPPoE", href: "/pppoe", icon: Plug },
       { title: "DHCP", href: "/dhcp", icon: Globe },
+      { title: "RADIUS", href: "/radius", icon: CircleDot },
       { title: "Events", href: "/events", icon: Webhook },
       { title: "Monitoring", href: "/monitoring", icon: MonitorCog },
     ],

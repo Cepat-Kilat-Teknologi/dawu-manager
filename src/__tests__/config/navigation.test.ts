@@ -68,8 +68,8 @@ describe("navigation config", () => {
   });
 
   describe("nodeNavItems", () => {
-    it("has 16 navigation items from all sections", () => {
-      expect(nodeNavItems).toHaveLength(16);
+    it("has 18 navigation items from all sections", () => {
+      expect(nodeNavItems).toHaveLength(18);
     });
 
     it("equals the flat list of all section items", () => {
@@ -93,6 +93,8 @@ describe("navigation config", () => {
       expect(titles).toContain("Events");
       expect(titles).toContain("Monitoring");
       expect(titles).toContain("Logs");
+      expect(titles).toContain("History");
+      expect(titles).toContain("RADIUS");
     });
 
     it("Overview has empty href (relative)", () => {
