@@ -7,8 +7,8 @@ import { ProxyDataTable, type ProxyColumn } from "@/components/node/proxy-data-t
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
-import { cn, formatUptime } from "@/lib/utils";
+import { RefreshCw, CheckCircle2, AlertTriangle, BarChart3 } from "lucide-react";
+import { cn, formatUptime, formatValue } from "@/lib/utils";
 
 /** Live resource metrics from `system/metrics` (nested objects, polled). */
 interface Metrics {
@@ -54,6 +54,14 @@ interface LldpNeighbor {
   remote_description?: string;
   ttl?: number;
 }
+
+/** Extended stats entry — key-value pairs from `sessions/stats-extended`. */
+interface ExtendedStatsEntry {
+  [key: string]: string | number | undefined;
+}
+
+/** Stat keys that should NOT appear in extended stats (already shown in gauges). */
+const EXTENDED_SKIP = new Set(["cpu_percent", "pool_used", "pool_total"]);
 
 /** Progress-bar colour by utilisation: green ≤ 70 < amber ≤ 90 < red. */
 function usageColor(pct: number): string {
@@ -155,6 +163,7 @@ export default function SystemPage() {
   const metrics = useNodeProxy<Metrics>(nodeId, "system/metrics", { refetchInterval: 15_000 });
   const ntp = useNodeProxy<NtpStatus>(nodeId, "ntp/status");
   const lldp = useNodeProxy<LldpNeighbor[]>(nodeId, "lldp/neighbors", { extract: "neighbors" });
+  const extendedStats = useNodeProxy<ExtendedStatsEntry>(nodeId, "sessions/stats-extended");
 
   const cpu = metrics.data?.cpu;
   const mem = metrics.data?.memory;
@@ -364,6 +373,53 @@ export default function SystemPage() {
           )}
         </div>
       </div>
+
+      {/* Extended statistics from sessions/stats-extended */}
+      <NodePageShell
+        title="Extended Statistics"
+        isLoading={extendedStats.isLoading}
+        error={extendedStats.error}
+        onRetry={() => extendedStats.refetch()}
+        isEmpty={
+          extendedStats.data !== null &&
+          extendedStats.data !== undefined &&
+          Object.keys(extendedStats.data).filter((k) => !EXTENDED_SKIP.has(k))
+            .length === 0
+        }
+        emptyMessage="No extended statistics available."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => extendedStats.refetch()}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+          </Button>
+        }
+      >
+        {extendedStats.data && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(extendedStats.data)
+              .filter(([key]) => !EXTENDED_SKIP.has(key))
+              .map(([key, value]) => (
+                <div
+                  key={key}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
+                >
+                  <BarChart3 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground">
+                      {key.replace(/_/g, " ")}
+                    </p>
+                    <p className="mt-0.5 font-mono text-sm font-semibold tabular-nums">
+                      {formatValue(value)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </NodePageShell>
     </div>
   );
 }

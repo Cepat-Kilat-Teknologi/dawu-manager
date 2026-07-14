@@ -281,9 +281,9 @@ describe("SystemPage", () => {
     mockUseNodeProxy.mockReturnValue(mockQuery({ error: new Error("down"), refetch }));
     render(<SystemPage />);
     const retries = screen.getAllByText("Retry");
-    expect(retries.length).toBe(5);
+    expect(retries.length).toBe(6);
     retries.forEach((b) => fireEvent.click(b));
-    expect(refetch).toHaveBeenCalledTimes(5);
+    expect(refetch).toHaveBeenCalledTimes(6);
   });
 
   it("refreshes the metrics and LLDP sections", () => {
@@ -296,8 +296,57 @@ describe("SystemPage", () => {
     });
     render(<SystemPage />);
     const refresh = screen.getAllByText("Refresh");
-    expect(refresh.length).toBe(2);
+    expect(refresh.length).toBe(3);
     refresh.forEach((b) => fireEvent.click(b));
-    expect(refetch).toHaveBeenCalledTimes(2);
+    expect(refetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("renders extended stats cards", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "sessions/stats-extended") {
+        return mockQuery({
+          data: {
+            ppp_starting: "2",
+            ppp_active: "150",
+          },
+        });
+      }
+      return mockQuery();
+    });
+    render(<SystemPage />);
+    expect(screen.getByText("Extended Statistics")).toBeTruthy();
+    expect(screen.getByText("ppp starting")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByText("ppp active")).toBeTruthy();
+    expect(screen.getByText("150")).toBeTruthy();
+  });
+
+  it("shows empty state for extended stats", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "sessions/stats-extended") return mockQuery({ data: {} });
+      return mockQuery();
+    });
+    render(<SystemPage />);
+    expect(screen.getByText("No extended statistics available.")).toBeTruthy();
+  });
+
+  it("filters EXTENDED_SKIP keys from extended stats", () => {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "sessions/stats-extended") {
+        return mockQuery({
+          data: {
+            cpu_percent: "10",
+            pool_used: "5",
+            pool_total: "100",
+            ppp_finishing: "3",
+          },
+        });
+      }
+      return mockQuery();
+    });
+    render(<SystemPage />);
+    // cpu_percent, pool_used, pool_total are in EXTENDED_SKIP — only ppp_finishing shown
+    expect(screen.getByText("ppp finishing")).toBeTruthy();
+    expect(screen.getByText("3")).toBeTruthy();
   });
 });
