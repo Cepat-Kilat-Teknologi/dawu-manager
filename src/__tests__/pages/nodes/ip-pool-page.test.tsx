@@ -108,7 +108,8 @@ describe("IpPoolPage", () => {
     );
     render(<IpPoolPage />);
     expect(screen.getAllByText("pool error").length).toBeGreaterThanOrEqual(1);
-    fireEvent.click(screen.getByText("Retry"));
+    const retries = screen.getAllByText("Retry");
+    retries.forEach((btn) => fireEvent.click(btn));
     expect(refetch).toHaveBeenCalled();
   });
 
@@ -200,7 +201,8 @@ describe("IpPoolPage", () => {
       return mockQuery();
     });
     render(<IpPoolPage />);
-    fireEvent.click(screen.getByText("Refresh"));
+    const refreshButtons = screen.getAllByText("Refresh");
+    fireEvent.click(refreshButtons[0]);
     expect(refetch).toHaveBeenCalled();
   });
 
@@ -276,5 +278,109 @@ describe("IpPoolPage", () => {
     render(<IpPoolPage />);
     fireEvent.click(screen.getByText("Add Pool"));
     expect(screen.getByText("Creating…")).toBeTruthy();
+  });
+});
+
+describe("IpPoolPage pool detail", () => {
+  function withDetail(detail: unknown) {
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "ip-pool") return mockQuery({ data: [] });
+      if (path === "ip-pool/usage")
+        return mockQuery({ data: { used: "0", total: "253", available: "253" } });
+      if (path === "ip-pool/detail") return mockQuery({ data: detail });
+      return mockQuery();
+    });
+  }
+
+  it("renders pool detail accordion with allocation count", () => {
+    withDetail({
+      "pool-a": [
+        { ip: "10.0.0.1", username: "alice", session_id: "s1" },
+        { ip: "10.0.0.2", username: "bob", session_id: "s2" },
+      ],
+      "pool-b": [{ ip: "10.1.0.1", username: "charlie", session_id: "s3" }],
+    });
+    render(<IpPoolPage />);
+    expect(screen.getByText("Pool Detail")).toBeTruthy();
+    expect(screen.getByText("pool-a")).toBeTruthy();
+    expect(screen.getByText("2 allocations")).toBeTruthy();
+    expect(screen.getByText("pool-b")).toBeTruthy();
+    expect(screen.getByText("1 allocation")).toBeTruthy();
+  });
+
+  it("expands and collapses a pool accordion", () => {
+    withDetail({
+      "pool-a": [
+        { ip: "10.0.0.1", username: "alice", session_id: "s1" },
+      ],
+    });
+    render(<IpPoolPage />);
+    // Initially collapsed — table rows not visible
+    expect(screen.queryByText("alice")).toBeNull();
+
+    // Click to expand
+    fireEvent.click(screen.getByText("pool-a"));
+    expect(screen.getByText("alice")).toBeTruthy();
+    expect(screen.getByText("10.0.0.1")).toBeTruthy();
+    expect(screen.getByText("s1")).toBeTruthy();
+
+    // Click again to collapse
+    fireEvent.click(screen.getByText("pool-a"));
+    expect(screen.queryByText("alice")).toBeNull();
+  });
+
+  it("shows empty message for pool detail with no pools", () => {
+    withDetail({});
+    render(<IpPoolPage />);
+    expect(screen.getByText("No pool allocation details available.")).toBeTruthy();
+  });
+
+  it("renders pool with non-array entries as empty list", () => {
+    withDetail({ "pool-x": "not-an-array" });
+    render(<IpPoolPage />);
+    expect(screen.getByText("pool-x")).toBeTruthy();
+    expect(screen.getByText("0 allocations")).toBeTruthy();
+  });
+
+  it("shows em-dash for missing IP in detail entries", () => {
+    withDetail({ "pool-a": [{ username: "alice" }] });
+    render(<IpPoolPage />);
+    fireEvent.click(screen.getByText("pool-a"));
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows em-dash for missing username in detail entries", () => {
+    withDetail({ "pool-a": [{ ip: "10.0.0.1", session_id: "s1" }] });
+    render(<IpPoolPage />);
+    fireEvent.click(screen.getByText("pool-a"));
+    expect(screen.getByText("10.0.0.1")).toBeTruthy();
+    expect(screen.getByText("s1")).toBeTruthy();
+    // username missing → em-dash
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows empty message when expanded pool has zero items", () => {
+    withDetail({ "pool-a": [] });
+    render(<IpPoolPage />);
+    expect(screen.getByText("0 allocations")).toBeTruthy();
+    fireEvent.click(screen.getByText("pool-a"));
+    expect(screen.getByText("No allocations in this pool.")).toBeTruthy();
+  });
+
+  it("refreshes pool detail section", () => {
+    const refetch = vi.fn();
+    mockUseNodeProxy.mockImplementation((_nid: string, path: string) => {
+      if (path === "ip-pool") return mockQuery({ data: [] });
+      if (path === "ip-pool/usage")
+        return mockQuery({ data: { used: "0", total: "253", available: "253" } });
+      if (path === "ip-pool/detail")
+        return mockQuery({ data: { "pool-a": [] }, refetch });
+      return mockQuery();
+    });
+    render(<IpPoolPage />);
+    // Pool Detail section has its own Refresh button
+    const refreshButtons = screen.getAllByText("Refresh");
+    fireEvent.click(refreshButtons[refreshButtons.length - 1]);
+    expect(refetch).toHaveBeenCalled();
   });
 });
