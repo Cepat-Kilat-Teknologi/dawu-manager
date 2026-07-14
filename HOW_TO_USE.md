@@ -150,8 +150,10 @@ The node detail page provides deep access to each BNG node's functionality throu
 | **Logs**        | Log viewer and real-time streaming                    |
 | **System**      | System information, health, metrics                   |
 | **DHCP**        | DHCP server and relay management                      |
-| **Diagnostics** | Zones, conntrack entries, limits, event hooks          |
+| **Diagnostics** | Zones, conntrack entries, limits, flush                |
 | **Events**      | Event hooks and webhook management                    |
+| **History**     | Session history, snapshots, CSV export, purge          |
+| **RADIUS**      | RADIUS config display, status, interactive health check |
 
 ### Proxy Access
 
@@ -275,6 +277,78 @@ docker compose down -v
 
 ---
 
+## Fleet Operations
+
+Fleet operations let you execute actions across multiple BNG nodes simultaneously from the **Operations** page in the sidebar.
+
+### Available Operations
+
+| Operation | Description | Destructive |
+|-----------|-------------|:-----------:|
+| Health Check | Query `/health` on each selected node | No |
+| Restart Service | Restart accel-ppp on each selected node | Yes |
+| Bulk Terminate | Disconnect specified PPPoE sessions across nodes | Yes |
+| Bulk Rate Limit | Apply rate limits to specified subscribers across nodes | No |
+
+### How It Works
+
+1. Select one or more nodes using the checkboxes.
+2. Choose an operation from the dropdown.
+3. Provide parameters if required (e.g., usernames for bulk terminate).
+4. Click **Run** — destructive operations require confirmation.
+
+Operations execute concurrently across all selected nodes. Each node has a 15-second timeout, and a single slow node does not block the others. Results show per-node success/failure status.
+
+---
+
+## Audit Trail
+
+The **Audit** page (sidebar → Audit Trail) provides a central log of all management actions performed through dawu-manager.
+
+### Features
+
+- **Filterable** — Filter by user, node, action type, and date range.
+- **CSV export** — Export filtered audit entries to CSV for compliance or review.
+- **CSV injection protection** — Exported values are sanitized to prevent spreadsheet formula injection.
+
+### What Gets Logged
+
+All write operations through the proxy are automatically logged, including:
+- Session termination / bulk terminate
+- Service start / stop / restart
+- Config apply / restore
+- Firewall rule changes
+- Node add / edit / delete
+- User management actions
+
+---
+
+## Alerts
+
+The **Alerts** page (sidebar → Alerts) provides configurable threshold-based alerting.
+
+### Alert Rules
+
+Create rules that monitor node metrics and trigger when thresholds are exceeded:
+
+| Field | Description |
+|-------|-------------|
+| Name | Human-readable rule name |
+| Metric | The metric to monitor (e.g., `active_sessions`, `cpu_usage`) |
+| Operator | Comparison operator (`>`, `<`, `>=`, `<=`, `==`) |
+| Threshold | Numeric threshold value |
+| Node | Which node to monitor (or all nodes) |
+
+### Alert Events
+
+When a rule triggers, an event is recorded with the metric value, timestamp, and status. View event history on the Alerts page.
+
+### Webhook Notifications
+
+Configure webhook URLs to receive HTTP POST notifications when alerts fire. Useful for integration with Slack, Telegram, or monitoring systems.
+
+---
+
 ## Tips and Best Practices
 
 ### 1. Use meaningful node names
@@ -317,3 +391,33 @@ For npx deployments:
 ```bash
 cp ~/.dawu-manager/data.db ./dawu-backup-$(date +%Y%m%d).db
 ```
+
+---
+
+## Upgrading
+
+### npx
+
+```bash
+npx dawu-manager@latest
+```
+
+Database migrations run automatically on startup.
+
+### Docker
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### From source
+
+```bash
+git pull
+pnpm install
+pnpm exec prisma migrate deploy
+pnpm build
+```
+
+> **Tip:** Always back up your database before upgrading. See the [Upgrade Guide](docs/getting-started/upgrade.md) for detailed version-specific instructions and rollback procedures.
