@@ -418,3 +418,142 @@ describe("PppoePage", () => {
     );
   });
 });
+
+describe("PppoePage runtime config", () => {
+  it("shows loading state for runtime section", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime" ? mockQuery({ isLoading: true }) : undefined,
+    );
+    render(<PppoePage />);
+    expect(screen.getByText("PPPoE Runtime Config")).toBeTruthy();
+  });
+
+  it("shows unavailable badge on runtime error", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime"
+        ? mockQuery({ error: new Error("runtime down") })
+        : undefined,
+    );
+    render(<PppoePage />);
+    expect(screen.getByText("unavailable")).toBeTruthy();
+  });
+
+  it("renders runtime data as key-value pairs, filtering raw_output", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime"
+        ? mockQuery({
+            data: {
+              service_name: "internet",
+              ac_name: "dawos-dev",
+              verbose: 1,
+              raw_output: "should be hidden",
+            },
+          })
+        : undefined,
+    );
+    render(<PppoePage />);
+    expect(screen.getByText("service name")).toBeTruthy();
+    expect(screen.getByText("internet")).toBeTruthy();
+    expect(screen.getByText("ac name")).toBeTruthy();
+    expect(screen.getByText("dawos-dev")).toBeTruthy();
+    expect(screen.queryByText("should be hidden")).toBeNull();
+  });
+
+  it("shows 'No runtime data' when runtime data is null", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime" ? mockQuery({ data: null }) : undefined,
+    );
+    render(<PppoePage />);
+    expect(screen.getByText("No runtime data")).toBeTruthy();
+  });
+
+  it("renders em-dash for null runtime config values", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime"
+        ? mockQuery({
+            data: {
+              service_name: null,
+              ac_name: "dawos-dev",
+            },
+          })
+        : undefined,
+    );
+    render(<PppoePage />);
+    expect(screen.getByText("—")).toBeTruthy();
+    expect(screen.getByText("dawos-dev")).toBeTruthy();
+  });
+
+  it("applies runtime settings with all fields filled", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime"
+        ? mockQuery({ data: { service_name: "internet" } })
+        : undefined,
+    );
+    render(<PppoePage />);
+
+    fireEvent.change(screen.getByLabelText("Service Name"), {
+      target: { value: "myisp" },
+    });
+    fireEvent.change(screen.getByLabelText("AC Name"), {
+      target: { value: "bng-1" },
+    });
+    fireEvent.change(screen.getByLabelText("Verbose"), {
+      target: { value: "2" },
+    });
+    fireEvent.click(screen.getByText("Apply Runtime Settings"));
+
+    const m = mutationMap.get("n1:POST:pppoe/runtime-set")!;
+    expect(m.mutate).toHaveBeenCalledWith({
+      service_name: "myisp",
+      ac_name: "bng-1",
+      verbose: 2,
+    });
+  });
+
+  it("shows toast error when no fields are filled", () => {
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime"
+        ? mockQuery({ data: { service_name: "internet" } })
+        : undefined,
+    );
+    render(<PppoePage />);
+    fireEvent.click(screen.getByText("Apply Runtime Settings"));
+    expect(toast.error).toHaveBeenCalledWith(
+      "Provide at least one field to update",
+    );
+  });
+
+  it("fires onSuccess toast for runtime-set mutation", () => {
+    withData([], "filter type: disabled");
+    render(<PppoePage />);
+    const m = mutationMap.get("n1:POST:pppoe/runtime-set")!;
+    m.onSuccess!();
+    expect(toast.success).toHaveBeenCalledWith(
+      "PPPoE runtime settings updated",
+    );
+  });
+
+  it("disables inputs while runtime-set is pending", () => {
+    mockUseNodeProxyMutation.mockImplementation(
+      (_nid: string, path: string, opts?: MutationOpts) => {
+        void `${_nid}:${opts?.method ?? "POST"}`;
+        return {
+          mutate: vi.fn(),
+          mutateAsync: vi.fn().mockResolvedValue({}),
+          isPending: path === "pppoe/runtime-set",
+          onSuccess: opts?.onSuccess,
+        };
+      },
+    );
+    withData([], "filter type: disabled", (path) =>
+      path === "pppoe/runtime"
+        ? mockQuery({ data: { service_name: "internet" } })
+        : undefined,
+    );
+    render(<PppoePage />);
+    const serviceInput = screen.getByLabelText("Service Name") as HTMLInputElement;
+    expect(serviceInput.disabled).toBe(true);
+    const applyBtn = screen.getByText("Apply Runtime Settings").closest("button");
+    expect(applyBtn?.disabled).toBe(true);
+  });
+});

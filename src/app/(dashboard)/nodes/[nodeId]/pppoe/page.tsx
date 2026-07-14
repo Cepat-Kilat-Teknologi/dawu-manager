@@ -19,7 +19,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Network, RefreshCw, ShieldCheck, Plus, Trash2, Loader2 } from "lucide-react";
+import { Network, RefreshCw, ShieldCheck, Plus, Trash2, Loader2, Settings2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 /** A PPPoE access interface as returned by dawos-agent (`pppoe/interfaces`). */
 interface PppoeInterface {
@@ -27,6 +28,14 @@ interface PppoeInterface {
   name: string;
   /** Space-separated accel-ppp options string (may be empty). */
   options: string;
+}
+
+/** PPPoE runtime configuration from `pppoe/runtime`. */
+interface PppoeRuntime {
+  service_name?: string;
+  ac_name?: string;
+  verbose?: string | number;
+  [key: string]: unknown;
 }
 
 /** A pending deletion driving the shared confirm dialog. */
@@ -130,6 +139,7 @@ export default function PppoePage() {
     nodeId,
     "pppoe/mac-filter",
   );
+  const runtime = useNodeProxy<PppoeRuntime>(nodeId, "pppoe/runtime");
 
   // Add-interface dialog state.
   const [addOpen, setAddOpen] = useState(false);
@@ -144,6 +154,11 @@ export default function PppoePage() {
   // Pending deletion (interface or MAC) driving the shared confirm dialog.
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
 
+  // PPPoE runtime config state
+  const [rtServiceName, setRtServiceName] = useState("");
+  const [rtAcName, setRtAcName] = useState("");
+  const [rtVerbose, setRtVerbose] = useState("");
+
   // Both list queries are two-segment paths, so invalidate the FULL paths:
   // ["pppoe"] alone would not partial-match ["node-proxy", id, "pppoe/*"].
   const invalidates = ["pppoe/interfaces", "pppoe/mac-filter"];
@@ -156,6 +171,15 @@ export default function PppoePage() {
     nodeId,
     "pppoe/mac-filter",
     { invalidates },
+  );
+
+  const runtimeSetMutation = useNodeProxyMutation<Record<string, unknown>>(
+    nodeId,
+    "pppoe/runtime-set",
+    {
+      invalidates: ["pppoe/runtime"],
+      onSuccess: () => toast.success("PPPoE runtime settings updated"),
+    },
   );
 
   const deletePath =
@@ -374,6 +398,96 @@ export default function PppoePage() {
           )}
         </div>
       </NodePageShell>
+
+      {/* PPPoE Runtime Config */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Settings2 className="h-4 w-4" />
+            PPPoE Runtime Config
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {runtime.isLoading ? (
+            <div className="animate-pulse h-6 w-20 rounded bg-muted" />
+          ) : runtime.error ? (
+            <Badge variant="outline">unavailable</Badge>
+          ) : runtime.data ? (
+            <dl className="grid gap-1 text-xs">
+              {Object.entries(runtime.data)
+                .filter(([k]) => k !== "raw_output")
+                .map(([k, v]) => (
+                  <div key={k} className="flex justify-between">
+                    <dt className="text-muted-foreground">
+                      {k.replace(/_/g, " ")}
+                    </dt>
+                    <dd className="font-mono">{String(v ?? "—")}</dd>
+                  </div>
+                ))}
+            </dl>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              No runtime data
+            </span>
+          )}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="rt-service-name">Service Name</Label>
+              <Input
+                id="rt-service-name"
+                placeholder={String(runtime.data?.service_name ?? "internet")}
+                value={rtServiceName}
+                onChange={(e) => setRtServiceName(e.target.value)}
+                disabled={runtimeSetMutation.isPending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rt-ac-name">AC Name</Label>
+              <Input
+                id="rt-ac-name"
+                placeholder={String(runtime.data?.ac_name ?? "")}
+                value={rtAcName}
+                onChange={(e) => setRtAcName(e.target.value)}
+                disabled={runtimeSetMutation.isPending}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rt-verbose">Verbose</Label>
+              <Input
+                id="rt-verbose"
+                type="number"
+                min={0}
+                max={2}
+                placeholder={String(runtime.data?.verbose ?? "0")}
+                value={rtVerbose}
+                onChange={(e) => setRtVerbose(e.target.value)}
+                disabled={runtimeSetMutation.isPending}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              const body: Record<string, unknown> = {};
+              if (rtServiceName.trim())
+                body.service_name = rtServiceName.trim();
+              if (rtAcName.trim()) body.ac_name = rtAcName.trim();
+              if (rtVerbose.trim()) body.verbose = parseInt(rtVerbose, 10);
+              if (Object.keys(body).length === 0) {
+                toast.error("Provide at least one field to update");
+                return;
+              }
+              runtimeSetMutation.mutate(body);
+            }}
+            disabled={runtimeSetMutation.isPending}
+          >
+            {runtimeSetMutation.isPending && (
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            )}
+            Apply Runtime Settings
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Add-interface dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
