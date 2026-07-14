@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     // AI tooling directories (not project source):
     ".agents/**",
     ".omc/**",
+    // Documentation site build output:
+    "site/**",
   ]),
 ]);
 
