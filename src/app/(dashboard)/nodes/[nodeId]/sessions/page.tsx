@@ -25,6 +25,7 @@ import {
   Network,
   Clock,
   Info,
+  Download,
 } from "lucide-react";
 import { formatValue } from "@/lib/utils";
 
@@ -334,6 +335,19 @@ export default function SessionsPage() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const proxy = `/api/nodes/${encodeURIComponent(nodeId)}/proxy/sessions/export?format=csv`;
+                const a = document.createElement("a");
+                a.href = proxy;
+                a.download = "sessions.csv";
+                a.click();
+              }}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
+            </Button>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
               Refresh

@@ -533,3 +533,22 @@ describe("SessionsPage bulk operations", () => {
     ).toBeTruthy();
   });
 });
+
+describe("SessionsPage CSV export", () => {
+  it("exports sessions as CSV via anchor download", () => {
+    mockPaths({ sessions: sessionRows(), stats: null });
+    render(<SessionsPage />);
+    const clickSpy = vi.fn();
+    const origCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = origCreate(tag);
+      if (tag === "a") {
+        Object.defineProperty(el, "click", { value: clickSpy });
+      }
+      return el;
+    });
+    fireEvent.click(screen.getByText("CSV"));
+    expect(clickSpy).toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+});
