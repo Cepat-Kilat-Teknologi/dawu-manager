@@ -1,6 +1,6 @@
 # Node Feature Pages
 
-Each registered node has 15 category pages accessible from the node detail sidebar. These pages provide read and write access to the dawos-agent API endpoints on that specific BNG node.
+Each registered node has 17 category pages accessible from the node detail sidebar. These pages provide read and write access to the dawos-agent API endpoints on that specific BNG node.
 
 All operations on these pages are proxied through dawu-manager's server-side API routes. The browser never contacts the BNG node directly.
 
@@ -18,6 +18,7 @@ Displays active PPPoE sessions on the BNG node.
 | Search | Filter sessions by username or IP address |
 | Terminate | Disconnect individual sessions (operator+ role required) |
 | Bulk terminate | Disconnect multiple sessions at once |
+| CSV export | Export current session list to CSV file |
 
 ---
 
@@ -53,6 +54,7 @@ Manages the accel-ppp configuration file (`/etc/accel-ppp.conf`).
 | Apply with guard timer | Apply changes with a configurable rollback timer (in minutes) |
 | Diff | Compare the running configuration against a saved backup |
 | Backup list | View and restore previous configuration backups |
+| Backup/restore | Create manual backups and restore from any saved backup |
 
 !!! warning "Guard timer"
     When applying a configuration change, specify a `confirm_minutes` value. If not confirmed within that window, the configuration automatically rolls back to the previous version. This prevents lockout from misconfiguration.
@@ -118,6 +120,7 @@ Manages PPPoE-specific settings.
 | PPPoE interfaces | List, add, and remove PPPoE listener interfaces |
 | MAC filters | Add and remove MAC address filters |
 | PADO delay | Configure PPPoE Active Discovery Offer delay |
+| Runtime config | Display live PPPoE runtime configuration (service name, AC name, session limits) |
 
 ---
 
@@ -147,7 +150,9 @@ Manages IP address pools for subscriber assignment.
 
 | Feature | Description |
 |---------|-------------|
-| Pool list | View configured IP address pools |
+| Pool list | View configured IP address pools with usage bars (green/amber/red thresholds) |
+| Usage tiles | Aggregate usage statistics (used, total, available) with overall usage bar |
+| Pool detail | Expandable accordion showing per-pool allocations (IP, username, session ID) |
 | Add pool | Create a new pool with name and CIDR range (e.g., `10.0.0.0/24`) |
 | Delete pool | Remove an existing pool |
 
@@ -194,7 +199,7 @@ Displays system-level information about the BNG node.
 |---------|-------------|
 | System info | Hostname, OS, kernel version, uptime |
 | Health | Overall system health status |
-| Metrics | CPU, memory, disk, and network utilization |
+| Metrics | CPU, memory, disk, and network utilization displayed as stat cards |
 
 ---
 
@@ -238,6 +243,41 @@ Manages event hooks and webhooks on the BNG node.
 | Add hook | Create a new event hook with trigger conditions |
 | Delete hook | Remove an existing event hook |
 | Fire event | Manually trigger an event for testing |
+
+---
+
+## History
+
+**Path:** `/nodes/[nodeId]/history`
+
+Manages session history snapshots and historical data.
+
+| Feature | Description |
+|---------|-------------|
+| History table | View historical session entries with username, IP, MAC, interface, start/end time, duration, and terminate cause |
+| Statistics | Aggregate history stats grid (total sessions, average duration, peak concurrent) |
+| Snapshot | Capture a point-in-time snapshot of current active sessions into history |
+| CSV export | Export all session history entries to a CSV file via browser download |
+| Purge | Permanently delete all session history entries (with confirmation dialog) |
+| Refresh | Independently refresh the history table and statistics sections |
+
+---
+
+## RADIUS
+
+**Path:** `/nodes/[nodeId]/radius`
+
+RADIUS server diagnostics and health checking.
+
+| Feature | Description |
+|---------|-------------|
+| Configuration | Read-only display of RADIUS configuration (auth/acct server, ports). Shared secrets are never exposed via the API |
+| Status | Current RADIUS connection status and request/response counters |
+| Health check | Interactive connectivity test to the configured RADIUS server with latency measurement and pass/fail reporting |
+| Extra fields | Health check results display additional server metadata (server type, version) when available |
+
+!!! note "Security"
+    The RADIUS configuration page displays server addresses and ports only. Shared secrets are intentionally excluded from the API response and never appear in the dashboard.
 
 ---
 
