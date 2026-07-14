@@ -17,6 +17,8 @@ dawu-manager provides a centralized web interface for managing multiple [dawos-a
 - **Alert system** -- Configurable threshold rules with webhook notification support.
 - **Responsive design** -- Mobile-first layout with sidebar navigation, skeleton loading states, and dark mode support.
 - **Embedded database** -- SQLite via Prisma with zero external database dependencies.
+- **Session history** -- View, export, and manage historical session data with CSV export and snapshot creation.
+- **RADIUS diagnostics** -- RADIUS configuration display, status monitoring, and interactive health check with latency reporting.
 - **One-command install** -- `npx dawu-manager` gets a production-ready instance running in seconds.
 
 ---
@@ -110,8 +112,8 @@ See the [Installation Guide](getting-started/installation.md) for complete instr
 
 | Section | Description |
 |---------|-------------|
-| [Getting Started](getting-started/installation.md) | Installation, configuration, and first-run setup |
-| [User Guide](user-guide/dashboard.md) | Dashboard, node management, health monitoring, and feature pages |
+| [Getting Started](getting-started/installation.md) | Installation, configuration, first-run setup, and upgrade guide |
+| [User Guide](user-guide/dashboard.md) | Dashboard, node management, health monitoring, and 17 feature pages |
 | [Deployment](deployment/docker.md) | Docker, systemd, nginx, and production hardening |
 | [Architecture](architecture/overview.md) | System design, proxy layer, database schema, and auth |
 | [API Reference](api/reference.md) | Complete endpoint documentation |

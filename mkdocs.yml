@@ -53,6 +53,7 @@ nav:
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - First-Run Setup: getting-started/first-run.md
+      - Upgrade Guide: getting-started/upgrade.md
   - User Guide:
       - Dashboard Overview: user-guide/dashboard.md
       - Node Management: user-guide/node-management.md
