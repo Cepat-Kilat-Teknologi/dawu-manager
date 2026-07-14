@@ -1,6 +1,6 @@
 {
   "name": "dawu-manager",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Web management dashboard for dawos-agent BNG nodes — manage multiple PPPoE/accel-ppp instances from a single UI",
   "author": "Cepat Kilat Teknologi",
   "license": "MIT",

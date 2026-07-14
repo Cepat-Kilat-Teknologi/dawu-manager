@@ -257,7 +257,7 @@ dawu-manager proxies requests to dawos-agent instances running on BNG nodes. Whe
 | dawu-manager | Minimum dawos-agent | Notes |
 |:------------:|:-------------------:|-------|
 | 0.1.0 | 0.3.0+ | Base compatibility for 145 endpoints |
-| 0.1.x (unreleased) | 0.4.0+ | Session history, RADIUS diagnostics, PPPoE runtime require v0.4.0 endpoints |
+| 0.1.1 | 0.4.0+ | Session history, RADIUS diagnostics, PPPoE runtime require v0.4.0 endpoints |
 
 !!! warning "Upgrade dawos-agent first"
     If the new dawu-manager version uses endpoints introduced in a newer dawos-agent version, upgrade your BNG nodes first. dawu-manager gracefully handles missing endpoints (shows "feature not available"), but new features will not work until the agent is updated.
@@ -284,7 +284,7 @@ For complete dawos-agent upgrade instructions, see the [dawos-agent Upgrade Guid
 
 ## Version-Specific Notes
 
-### Upgrading to v0.1.x (Unreleased)
+### Upgrading to v0.1.1
 
 New features added since v0.1.0:
 

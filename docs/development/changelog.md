@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.1.1] - 2026-07-15
+
 ### Added
 
 - **Session history page** (`/nodes/[nodeId]/history`) -- Session history table with stats grid, snapshot creation, CSV export, and purge with confirmation dialog.
@@ -90,9 +94,11 @@ The initial public release of dawu-manager. Published to npm and ghcr.io.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 0.1.1 | 2026-07-15 | Session history, RADIUS diagnostics, PPPoE runtime, IP pool detail, history CSV export, docs update |
 | 0.1.0 | 2026-07-12 | Initial release: multi-node management, 28 pages, 14 API routes, fleet operations, audit trail, alerts |
 
 ---
 
-[Unreleased]: https://github.com/Cepat-Kilat-Teknologi/dawu-manager/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Cepat-Kilat-Teknologi/dawu-manager/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Cepat-Kilat-Teknologi/dawu-manager/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Cepat-Kilat-Teknologi/dawu-manager/releases/tag/v0.1.0
