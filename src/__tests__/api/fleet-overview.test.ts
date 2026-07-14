@@ -393,6 +393,37 @@ describe("GET /api/fleet/overview", () => {
     expect(json.nodes.online).toBe(1);
   });
 
+  it("falls back to unknown when node.status is null", async () => {
+    mockAuth.mockResolvedValue(session);
+    mockPrisma.node.findMany.mockResolvedValue([
+      { ...makeNode("n1", "bng-1"), status: null },
+    ]);
+
+    mockDawosRequest.mockImplementation(
+      (_url: string, _key: string, path: string) => {
+        if (path === "system/metrics") {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            data: { cpu: { percent: 10 }, memory: { percent: 20 }, disk: { percent: 5 } },
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: { active: 10 },
+        });
+      },
+    );
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(json.nodes.unknown).toBe(1);
+    expect(json.nodes.online).toBe(0);
+    expect(json.topNodes[0].status).toBe("unknown");
+  });
+
   it("respects degraded and unknown DB statuses in aggregate counts", async () => {
     mockAuth.mockResolvedValue(session);
     mockPrisma.node.findMany.mockResolvedValue([

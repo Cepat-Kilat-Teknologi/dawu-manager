@@ -10,7 +10,7 @@ class NotFoundError extends Error {
 
 const { mockPrisma } = vi.hoisted(() => ({
   mockPrisma: {
-    node: { findUnique: vi.fn() },
+    node: { findUnique: vi.fn(), update: vi.fn() },
   },
 }));
 
@@ -76,16 +76,28 @@ describe("NodeDetailPage", () => {
 
   it("renders health data when fetch succeeds", async () => {
     mockPrisma.node.findUnique.mockResolvedValue(baseNode);
-    vi.mocked(global.fetch).mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          status: "ok",
-          version: "0.3.2",
-          uptime_seconds: 86400,
-          accel_version: "1.12",
-        }),
-    } as Response);
+    vi.mocked(global.fetch).mockImplementation((url: string | URL | Request) => {
+      const u = typeof url === "string" ? url : url.toString();
+      if (u.includes("/health/ready")) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              ready: true,
+              checks: [{ service: "accel-ppp", reachable: true, detail: "1.12" }],
+            }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            status: "ok",
+            version: "0.3.2",
+            uptime_seconds: 86400,
+          }),
+      } as Response);
+    });
 
     const jsx = await NodeDetailPage({ params: Promise.resolve({ nodeId: "n1" }) });
     render(jsx);
@@ -93,9 +105,13 @@ describe("NodeDetailPage", () => {
     expect(screen.getByText("0.3.2")).toBeTruthy();
     expect(screen.getByText(/accel-ppp: 1.12/)).toBeTruthy();
     expect(screen.getByText("1d 0m")).toBeTruthy();
+    // Should update DB status to online
+    expect(mockPrisma.node.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "online" }) }),
+    );
   });
 
-  it("shows Unknown version when health fails", async () => {
+  it("shows Unknown version when health fails and updates DB to offline", async () => {
     mockPrisma.node.findUnique.mockResolvedValue(baseNode);
     vi.mocked(global.fetch).mockRejectedValue(new Error("timeout"));
 
@@ -103,6 +119,10 @@ describe("NodeDetailPage", () => {
     render(jsx);
 
     expect(screen.getByText("Unknown")).toBeTruthy();
+    // Should update DB status to offline
+    expect(mockPrisma.node.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "offline" }) }),
+    );
   });
 
   it("shows — for uptime when health fails", async () => {
@@ -166,7 +186,7 @@ describe("NodeDetailPage", () => {
     expect(neverElements.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("handles non-ok health response", async () => {
+  it("handles non-ok health response and sets offline", async () => {
     mockPrisma.node.findUnique.mockResolvedValue(baseNode);
     vi.mocked(global.fetch).mockResolvedValue({
       ok: false,
@@ -178,6 +198,9 @@ describe("NodeDetailPage", () => {
     render(jsx);
 
     expect(screen.getByText("Unknown")).toBeTruthy();
+    expect(mockPrisma.node.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "offline" }) }),
+    );
   });
 
   it("handles timeout when health fetch hangs", async () => {

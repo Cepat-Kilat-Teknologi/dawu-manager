@@ -41,27 +41,59 @@ export default async function NodeDetailPage({ params }: NodeDetailPageProps) {
     notFound();
   }
 
-  // Attempt to fetch live health data
+  // Attempt to fetch live health data from both public endpoints concurrently
   let healthData: Record<string, unknown> | null = null;
+  let readyData: Record<string, unknown> | null = null;
   try {
-    const healthUrl = `${node.url.replace(/\/+$/, "")}/health`;
+    const baseUrl = node.url.replace(/\/+$/, "");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(healthUrl, {
-      signal: controller.signal,
-      cache: "no-store",
-    });
+
+    const [healthRes, readyRes] = await Promise.all([
+      fetch(`${baseUrl}/health`, {
+        signal: controller.signal,
+        cache: "no-store",
+      }).catch(() => null),
+      fetch(`${baseUrl}/health/ready`, {
+        signal: controller.signal,
+        cache: "no-store",
+      }).catch(() => null),
+    ]);
+
     clearTimeout(timer);
-    if (res.ok) {
-      healthData = await res.json();
+
+    if (healthRes?.ok) {
+      healthData = await healthRes.json();
+    }
+    if (readyRes?.ok) {
+      readyData = await readyRes.json();
     }
   } catch {
     // Node unreachable — show stored data only
   }
 
+  // Update DB status based on health check result (single source of truth)
+  const isReachable = healthData !== null;
+  const newStatus = isReachable ? "online" : "offline";
+  if (node.status !== newStatus || isReachable) {
+    await prisma.node.update({
+      where: { id: node.id },
+      data: {
+        status: newStatus,
+        ...(isReachable ? { lastSeen: new Date() } : {}),
+      },
+    });
+  }
+
   const version = healthData?.version as string | undefined;
   const uptime = healthData?.uptime_seconds as number | undefined;
-  const accelVersion = healthData?.accel_version as string | undefined;
+  // accel-ppp version comes from /health/ready checks array
+  const checks = (readyData?.checks ?? []) as Array<{
+    service?: string;
+    detail?: string;
+  }>;
+  const accelCheck = checks.find((c) => c.service === "accel-ppp");
+  const accelVersion = accelCheck?.detail as string | undefined;
   const tags = safeParseTags(node.tags);
 
   return (
