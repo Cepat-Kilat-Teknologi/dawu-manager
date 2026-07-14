@@ -17,9 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **IP pool detail** -- Per-pool allocation detail with expandable accordion showing IP, username, and session ID for each allocation.
 - **Session history CSV export** -- Export session history entries to CSV file via browser download.
 
+### Fixed
+
+- **History page data extraction** -- Fixed `extract: "sessions"` → `extract: "records"` to match dawos-agent response shape; history table now loads correctly (`fc75f26`).
+
 ### Changed
 
-- Updated documentation -- README, CHANGELOG, testing guide, node features guide to reflect current project state (1176 tests, 42 routes, 90 test files, 28 pages, 17 node feature pages).
+- Updated documentation -- README, CHANGELOG, testing guide, node features guide, upgrade guide to reflect current project state (1176 tests, 42 routes, 90 test files, 28 pages, 17 node feature pages).
+- **Integration tested all 17 node feature pages** against live dawos-dev BNG node -- all passing (Sessions, Service, Config, Firewall, Network, Traffic, PPPoE, Routing, IP Pool, Monitoring, Logs, System, DHCP, Diagnostics, Events, History, RADIUS).
 
 ---
 
