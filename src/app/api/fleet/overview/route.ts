@@ -73,8 +73,11 @@ export async function GET() {
   }
 
   // Fan out concurrently — each node has its own try/catch + timeout.
+  // Status comes from the DB (set by health checks), NOT from the fan-out.
+  // The fan-out is only for fetching live metrics (cpu, memory, sessions).
   const results: NodeResult[] = await Promise.all(
     dbNodes.map(async (node) => {
+      const dbStatus = (node.status || "unknown") as NodeResult["status"];
       try {
         const [metricsRes, statsRes] = await Promise.all([
           dawosRequest<NodeMetrics>(node.url, node.apiKey, "system/metrics", {
@@ -85,7 +88,6 @@ export async function GET() {
           }),
         ]);
 
-        const reachable = metricsRes.ok || statsRes.ok;
         const cpu = metricsRes.ok
           ? (metricsRes.data.cpu?.percent ?? 0)
           : 0;
@@ -102,18 +104,18 @@ export async function GET() {
         return {
           id: node.id,
           name: node.name,
-          status: reachable ? "online" : "offline",
+          status: dbStatus,
           sessions,
           cpu,
           memory,
           disk,
         } satisfies NodeResult;
       } catch {
-        // Node completely unreachable — count as offline.
+        // Node completely unreachable — use DB status (last known).
         return {
           id: node.id,
           name: node.name,
-          status: "offline",
+          status: dbStatus,
           sessions: 0,
           cpu: 0,
           memory: 0,
@@ -123,13 +125,14 @@ export async function GET() {
     }),
   );
 
-  // Aggregate counts. The fan-out produces only "online" | "offline" —
-  // degraded/unknown stay at 0 (no unreachable branches).
+  // Aggregate counts from DB-sourced status values.
   const counts = { total: results.length, online: 0, offline: 0, degraded: 0, unknown: 0 };
   let totalSessions = 0;
   for (const r of results) {
     if (r.status === "online") counts.online++;
-    else counts.offline++;
+    else if (r.status === "offline") counts.offline++;
+    else if (r.status === "degraded") counts.degraded++;
+    else counts.unknown++;
     totalSessions += r.sessions;
   }
 

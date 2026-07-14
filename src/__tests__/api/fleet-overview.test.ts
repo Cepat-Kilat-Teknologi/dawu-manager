@@ -93,9 +93,10 @@ describe("GET /api/fleet/overview", () => {
 
   it("degrades gracefully when a node is unreachable", async () => {
     mockAuth.mockResolvedValue(session);
+    const offlineNode = { ...makeNode("n2", "bng-2"), status: "offline" };
     mockPrisma.node.findMany.mockResolvedValue([
       makeNode("n1", "bng-1"),
-      makeNode("n2", "bng-2"),
+      offlineNode,
     ]);
 
     let callCount = 0;
@@ -130,10 +131,48 @@ describe("GET /api/fleet/overview", () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
+    // Status comes from DB: bng-1 "online", bng-2 "offline"
     expect(json.nodes.online).toBe(1);
     expect(json.nodes.offline).toBe(1);
     expect(json.sessions.total).toBe(200); // only bng-1
     expect(callCount).toBe(4); // 2 calls per node
+  });
+
+  it("uses DB status when fan-out fails (not re-determined from metrics)", async () => {
+    mockAuth.mockResolvedValue(session);
+    // Both nodes are "online" in DB, but bng-2 fan-out fails
+    mockPrisma.node.findMany.mockResolvedValue([
+      makeNode("n1", "bng-1"),
+      makeNode("n2", "bng-2"),
+    ]);
+
+    mockDawosRequest.mockImplementation(
+      (url: string, _key: string, path: string) => {
+        if (url.includes("bng-1")) {
+          if (path === "system/metrics") {
+            return Promise.resolve({
+              ok: true, status: 200,
+              data: { cpu: { percent: 30 }, memory: { percent: 40 }, disk: { percent: 10 } },
+            });
+          }
+          return Promise.resolve({ ok: true, status: 200, data: { active: 100 } });
+        }
+        // bng-2: both endpoints return errors — but DB says "online"
+        return Promise.resolve({ ok: false, status: 502, data: { error: "timeout" } });
+      },
+    );
+
+    const res = await GET();
+    const json = await res.json();
+
+    // bng-2 stays "online" (from DB) despite fan-out failure
+    expect(json.nodes.online).toBe(2);
+    expect(json.nodes.offline).toBe(0);
+    // bng-2 metrics are 0 because fan-out failed
+    const bng2 = json.topNodes.find((n: { name: string }) => n.name === "bng-2");
+    expect(bng2.status).toBe("online");
+    expect(bng2.sessions).toBe(0);
+    expect(bng2.cpu).toBe(0);
   });
 
   it("handles node that throws an exception", async () => {
@@ -147,8 +186,25 @@ describe("GET /api/fleet/overview", () => {
 
     expect(res.status).toBe(200);
     expect(json.nodes.total).toBe(1);
-    expect(json.nodes.offline).toBe(1);
+    // Uses DB status ("online") even when fan-out throws
+    expect(json.nodes.online).toBe(1);
+    expect(json.nodes.offline).toBe(0);
     expect(json.sessions.total).toBe(0);
+    expect(json.topNodes[0].status).toBe("online");
+  });
+
+  it("uses DB status for offline node on exception", async () => {
+    mockAuth.mockResolvedValue(session);
+    const offlineNode = { ...makeNode("n1", "bng-1"), status: "offline" };
+    mockPrisma.node.findMany.mockResolvedValue([offlineNode]);
+
+    mockDawosRequest.mockRejectedValue(new Error("network failure"));
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(json.nodes.offline).toBe(1);
+    expect(json.nodes.online).toBe(0);
     expect(json.topNodes[0].status).toBe("offline");
   });
 
@@ -272,7 +328,7 @@ describe("GET /api/fleet/overview", () => {
     const res = await GET();
     const json = await res.json();
 
-    // Node is still online because metrics succeeded
+    // Node is online because DB status is "online" (not re-determined from fan-out)
     expect(json.nodes.online).toBe(1);
     expect(json.sessions.total).toBe(0); // stats failed
     expect(json.topNodes[0].cpu).toBe(55);
@@ -335,5 +391,40 @@ describe("GET /api/fleet/overview", () => {
     expect(json.sessions.total).toBe(0);
     expect(json.topNodes[0].sessions).toBe(0);
     expect(json.nodes.online).toBe(1);
+  });
+
+  it("respects degraded and unknown DB statuses in aggregate counts", async () => {
+    mockAuth.mockResolvedValue(session);
+    mockPrisma.node.findMany.mockResolvedValue([
+      { ...makeNode("n1", "bng-1"), status: "degraded" },
+      { ...makeNode("n2", "bng-2"), status: "unknown" },
+      makeNode("n3", "bng-3"), // "online"
+    ]);
+
+    mockDawosRequest.mockImplementation(
+      (_url: string, _key: string, path: string) => {
+        if (path === "system/metrics") {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            data: { cpu: { percent: 10 }, memory: { percent: 20 }, disk: { percent: 5 } },
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          data: { active: 50 },
+        });
+      },
+    );
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(json.nodes.total).toBe(3);
+    expect(json.nodes.online).toBe(1);
+    expect(json.nodes.degraded).toBe(1);
+    expect(json.nodes.unknown).toBe(1);
+    expect(json.nodes.offline).toBe(0);
   });
 });
