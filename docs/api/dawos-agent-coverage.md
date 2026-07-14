@@ -6,7 +6,7 @@ dawu-manager proxies requests to dawos-agent instances running on BNG nodes. Thi
 
 ## Coverage Summary
 
-dawos-agent exposes 153 HTTP endpoints across 15 feature categories. dawu-manager provides dashboard pages for all 15 categories, covering the full API surface.
+dawos-agent exposes 153 HTTP endpoints across 17 feature categories. dawu-manager provides dashboard pages for all 17 categories, covering the full API surface.
 
 ---
 
@@ -177,6 +177,23 @@ dawos-agent exposes 153 HTTP endpoints across 15 feature categories. dawu-manage
 | Add hook | POST | `/api/v1/events/hooks` |
 | Delete hook | DELETE | `/api/v1/events/hooks/{id}` |
 | Fire event | POST | `/api/v1/events/fire` |
+
+### History
+
+| dawu-manager Action | Method | dawos-agent Endpoint |
+|---------------------|--------|---------------------|
+| Session history | GET | `/api/v1/sessions/history` |
+| History statistics | GET | `/api/v1/sessions/history/stats` |
+| Create snapshot | POST | `/api/v1/sessions/snapshot` |
+| Purge history | POST | `/api/v1/sessions/history/purge` |
+
+### RADIUS
+
+| dawu-manager Action | Method | dawos-agent Endpoint |
+|---------------------|--------|---------------------|
+| RADIUS config | GET | `/api/v1/radius/config` |
+| RADIUS status | GET | `/api/v1/radius/status` |
+| RADIUS health check | POST | `/api/v1/radius/health-check` |
 
 ---
 
