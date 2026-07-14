@@ -91,6 +91,20 @@ src/__tests__/
     node-routing.test.tsx
     node-ip-pool.test.tsx
     operations.test.tsx
+    nodes/                    # Per-node feature page tests
+      config-page.test.tsx
+      firewall-page.test.tsx
+      history-page.test.tsx
+      ip-pool-page.test.tsx
+      logs-page.test.tsx
+      monitoring-page.test.tsx
+      network-page.test.tsx
+      pppoe-page.test.tsx
+      radius-page.test.tsx
+      routing-page.test.tsx
+      sessions-page.test.tsx
+      system-page.test.tsx
+      traffic-page.test.tsx
 ```
 
 ---
