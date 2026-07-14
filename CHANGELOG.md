@@ -9,10 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Session history page** (`/nodes/[nodeId]/history`) — session history table with stats grid, snapshot creation, CSV export, and purge with confirmation dialog
+- **RADIUS diagnostics page** (`/nodes/[nodeId]/radius`) — RADIUS config and status display, interactive health check with latency reporting and toast feedback
+- **PPPoE runtime config** — live PPPoE runtime configuration display (service name, AC name, session limits) on the PPPoE page
+- **IP pool detail** — per-pool allocation detail with expandable accordion showing IP, username, and session ID for each allocation
+- **Session history CSV export** — export session history entries to CSV file via browser download
+
 ### Changed
 
-- Updated documentation — README, INSTALLATION, HOW_TO_USE, DAWOS_AGENT_GAPS to reflect current project state (1115 tests, 40 routes, 88 test files)
-- Marked dawos-agent gaps #1 (network/throughput) and #5 (conntrack/flush) as resolved — both added in dawos-agent v0.3.3
+- Updated documentation — README, CHANGELOG, testing guide, node features guide to reflect current project state (1176 tests, 42 routes, 90 test files, 28 pages, 17 node feature pages)
 
 ---
 
@@ -40,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added — Phase 1: Foundation
 
 - **Multi-node management** — add, monitor, and control multiple dawos-agent BNG nodes from a single dashboard
-- **26 pages** — dashboard overview, node list, add node, and 15 per-node category pages (sessions, service, config, firewall, network, traffic, pppoe, routing, ip-pool, monitoring, logs, system, dhcp, diagnostics, events) plus audit, alerts, operations, users, settings
+- **28 pages** — dashboard overview, node list, add node, and 17 per-node category pages (sessions, service, config, firewall, network, traffic, pppoe, routing, ip-pool, monitoring, logs, system, dhcp, diagnostics, events, history, radius) plus audit, alerts, operations, users, settings
 - **14 API routes** — auth, setup, node CRUD, health check, universal proxy, SSE streaming, activity/export, alert rules/events, fleet operations/overview
 - **Role-based access control** — admin, operator, viewer roles with route-level enforcement
 - **API key encryption** — AES-256-GCM with scrypt-derived keys; API keys encrypted at rest
